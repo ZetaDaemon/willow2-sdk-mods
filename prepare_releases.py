@@ -2,7 +2,7 @@ import itertools
 from pathlib import Path
 import tomllib
 from argparse import ArgumentParser, ArgumentTypeError
-from typing import Any, TypeVar
+from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
