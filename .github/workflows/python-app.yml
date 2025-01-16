@@ -1,0 +1,55 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: New Release
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - run: ./prepare_releases.py
+    - uses: actions/upload-artifact@v4
+      with:
+        path: |
+          *.zip
+          *.sdkmod
+          
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.repository == 'ZetaDaemon/willow2-sdk-mods'
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download releases
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ env.RELEASE_ARTIFACT_PRESET }}
+
+    - name: Upload releases
+      uses: andelf/nightly-release@main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: nightly
+        files: |
+          *.sdkmod
+          *.zip
+        name: Automated Releases
+        prerelease: false
+        body: >
+          This release is automatically built from the latest (passing) commits on master.
