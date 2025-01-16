@@ -36,8 +36,6 @@ jobs:
 
     - name: Download releases
       uses: actions/download-artifact@v4
-      with:
-        name: ${{ env.RELEASE_ARTIFACT_PRESET }}
 
     - name: Upload releases
       uses: andelf/nightly-release@main
