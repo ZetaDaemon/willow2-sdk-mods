@@ -5,7 +5,7 @@ authors = [{ name = "ZetaDaemon" }]
 description = "Skips dialog automatically."
 
 [project.urls]
-Changelog = "https://github.com/ZetaDaemon/willow2-sdk-mods/blob/main/dialog_skipper/readme.md#changelog"
+Changelog = "https://github.com/ZetaDaemon/willow2-sdk-mods/blob/main/dialog_skipper/readme.md#Changelog"
 
 [tool.sdkmod]
 name = "Dialog Skipper"
