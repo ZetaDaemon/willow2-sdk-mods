@@ -47,8 +47,8 @@ jobs:
       with:
         tag_name: nightly
         files: |
-          *.sdkmod
-          *.zip
+          ./*.sdkmod
+          ./*.zip
         name: Automated Releases
         prerelease: false
         body: >
