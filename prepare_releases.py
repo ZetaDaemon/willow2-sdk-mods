@@ -6,10 +6,6 @@ from typing import Any, TypeVar
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
-def dictget[T](dict: dict, key: str, default: T) -> T:
-    return dict.get(key, default)
-
-
 def dir_path_arg(arg: str) -> Path:
     """
     Argparse type converter which ensures the arg is a valid directory.
