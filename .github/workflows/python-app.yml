@@ -23,6 +23,7 @@ jobs:
         path: |
           *.zip
           *.sdkmod
+        name: releases
           
   release:
     runs-on: ubuntu-latest
@@ -40,7 +41,7 @@ jobs:
     - name: Download releases
       uses: actions/download-artifact@v4
       with:
-        path: ./
+        name: releases
 
     - name: Upload releases
       uses: andelf/nightly-release@main
@@ -49,8 +50,8 @@ jobs:
       with:
         tag_name: nightly
         files: |
-          ./*.sdkmod
-          ./*.zip
+          *.sdkmod
+          *.zip
         name: Automated Releases
         prerelease: false
         body: >
