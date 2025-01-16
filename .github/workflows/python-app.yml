@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - run: ./prepare_releases.py
+    - run: python ./prepare_releases.py
     - uses: actions/upload-artifact@v4
       with:
         path: |
