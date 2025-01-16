@@ -13,7 +13,9 @@ auto_skip_option = BoolOption("Autoskip Dialog", value=False)
 @keybind("Toggle Autoskip")
 def toggle_autoskip() -> None:
     auto_skip_option.value = not auto_skip_option.value
-    show_hud_message("Autoskip", f"Autoskip is now {'on' if auto_skip_option.value else 'off'}")
+    show_hud_message(
+        "Autoskip", f"Autoskip is now {'on' if auto_skip_option.value else 'off'}"
+    )
 
 
 @keybind("Skip Dialog")
@@ -24,7 +26,8 @@ def skip_dialog() -> None:
 
 def is_obj_allowed_to_talk(obj: UObject) -> bool:
     return not (
-        obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and not get_pc().Pawn.IsEnemy(obj)
+        obj.Class._inherits(unrealsdk.find_class("WillowAIPawn"))
+        and not get_pc().Pawn.IsEnemy(obj)
     )
 
 
