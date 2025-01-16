@@ -39,6 +39,8 @@ jobs:
 
     - name: Download releases
       uses: actions/download-artifact@v4
+      with:
+        path: ./
 
     - name: Upload releases
       uses: andelf/nightly-release@main
