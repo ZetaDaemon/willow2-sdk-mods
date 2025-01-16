@@ -23,13 +23,9 @@ def skip_dialog() -> None:
 
 
 def is_obj_allowed_to_talk(obj: UObject) -> bool:
-    if obj.Class._inherits(unrealsdk.find_class("WillowPlayerPawn")):
-        return True
-    if obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and get_pc().Pawn.IsEnemy(obj):
-        return True
-    if obj.Class._inherits(unrealsdk.find_class("WillowVendingMachine")):  # noqa: SIM103
-        return True
-    return False
+    return not (
+        obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and not get_pc().Pawn.IsEnemy(obj)
+    )
 
 
 @hook("GearboxFramework.Behavior_TriggerDialogEvent:TriggerDialogEvent")
