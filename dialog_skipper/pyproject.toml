@@ -1,0 +1,9 @@
+[project]
+name = "dialog_skipper"
+version = "2.0"
+authors = [{ name = "ZetaDaemon" }]
+description = "Skips dialog."
+
+[tool.sdkmod]
+name = "Dialog Skipper"
+version = "2.0"
