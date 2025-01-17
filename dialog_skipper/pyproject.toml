@@ -12,3 +12,6 @@ name = "Dialog Skipper"
 version = "2.0"
 license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
 download = "https://github.com/ZetaDaemon/willow2-sdk-mods/raw/refs/heads/main/dialog_skipper/dialog_skipper.sdkmod"
+
+[tool.sdkmod_release_script]
+files = ["*.md", "*.py"]
