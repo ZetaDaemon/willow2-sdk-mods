@@ -1,0 +1,19 @@
+[project]
+name = "ue_timers"
+version = "1.0"
+authors = [{ name = "ZetaDaemon" }, { name = "RedxYeti" }]
+description = """\
+Library to add timers using the unreal timer functionality. 
+Huge thanks to RedxYeti for the original information on how to make this work."""
+
+[project.urls]
+Changelog = "https://github.com/ZetaDaemon/willow2-sdk-mods/blob/main/ue_timers/readme.md#Changelog"
+
+[tool.sdkmod]
+name = "UE Timers"
+version = "1.0"
+license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/ue_timers.sdkmod"
+
+[tool.sdkmod_release_script]
+files = ["*.md", "*.py"]
