@@ -33,6 +33,8 @@ if __name__ == "__main__":
     for mod_folder in args.folders or (
         x for x in Path(__file__).parent.iterdir() if x.is_dir()
     ):
+        if mod_folder is not Path:
+            mod_folder = Path(mod_folder)
         if mod_folder.name.startswith("."):
             continue
         if not (mod_folder / "pyproject.toml").exists():
@@ -48,11 +50,13 @@ if __name__ == "__main__":
         file_types = sdkmod_release_script.get("files", [])
 
         output_file = mod_folder.with_suffix(".zip" if as_zip else ".sdkmod")
+        print(mod_folder.iterdir())
 
         with ZipFile(output_file, "w", ZIP_DEFLATED, compresslevel=9) as zip_file:
             for file in itertools.chain.from_iterable(
                 mod_folder.glob(pattern) for pattern in file_types
             ):
+                print("adding", file)
                 zip_file.write(file, mod_folder.name / file.relative_to(mod_folder))
 
             zip_file.write(
