@@ -43,23 +43,18 @@ if __name__ == "__main__":
         data: dict[str, dict[str, Any]] = tomllib.load(
             (mod_folder / "pyproject.toml").open("rb")
         )
-        print(data)
         sdkmod_release_script: dict = data.get("tool", {}).get(
             "sdkmod_release_script", {}
         )
-        print(sdkmod_release_script)
         as_zip = sdkmod_release_script.get("as_zip", False)
         file_types = sdkmod_release_script.get("files", [])
 
         output_file = mod_folder.with_suffix(".zip" if as_zip else ".sdkmod")
-        print([file for file in mod_folder.iterdir()])
-        print(file_types)
 
         with ZipFile(output_file, "w", ZIP_DEFLATED, compresslevel=9) as zip_file:
             for file in itertools.chain.from_iterable(
                 mod_folder.glob(pattern) for pattern in file_types
             ):
-                print("adding", file)
                 zip_file.write(file, mod_folder.name / file.relative_to(mod_folder))
 
             zip_file.write(
