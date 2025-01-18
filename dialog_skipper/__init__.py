@@ -7,6 +7,14 @@ from unrealsdk.hooks import Block
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct
 
 auto_skip_option = BoolOption("Autoskip Dialog", value=False)
+skip_all_dialog_option = BoolOption(
+    "Skip All Dialog",
+    value=False,
+    description=(
+        "Figuring out exactly what should or shouldnt be skipped is tricky, "
+        "this just makes it skip any dialog events regardless of what triggered it"
+    ),
+)
 
 
 @keybind("Toggle Autoskip")
@@ -22,6 +30,10 @@ def skip_dialog() -> None:
 
 
 def is_obj_allowed_to_talk(obj: UObject) -> bool:
+    if skip_all_dialog_option.value:
+        return False
+    if obj is None:
+        return True
     if obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and not get_pc().Pawn.IsEnemy(obj):
         return False
     if obj.Class._inherits(unrealsdk.find_class("WillowDialogEchoActor")):  # noqa: SIM103
