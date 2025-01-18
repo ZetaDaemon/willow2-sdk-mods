@@ -1,11 +1,10 @@
 from typing import Any
 
 import unrealsdk
-from unrealsdk.hooks import Block
-from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct
-
 from mods_base import BoolOption, build_mod, get_pc, hook, keybind
 from ui_utils import show_hud_message
+from unrealsdk.hooks import Block
+from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct
 
 auto_skip_option = BoolOption("Autoskip Dialog", value=False)
 
@@ -13,9 +12,7 @@ auto_skip_option = BoolOption("Autoskip Dialog", value=False)
 @keybind("Toggle Autoskip")
 def toggle_autoskip() -> None:
     auto_skip_option.value = not auto_skip_option.value
-    show_hud_message(
-        "Autoskip", f"Autoskip is now {'on' if auto_skip_option.value else 'off'}"
-    )
+    show_hud_message("Autoskip", f"Autoskip is now {'on' if auto_skip_option.value else 'off'}")
 
 
 @keybind("Skip Dialog")
@@ -25,40 +22,47 @@ def skip_dialog() -> None:
 
 
 def is_obj_allowed_to_talk(obj: UObject) -> bool:
-    return not (
-        obj.Class._inherits(unrealsdk.find_class("WillowAIPawn"))
-        and not get_pc().Pawn.IsEnemy(obj)
-    )
+    if obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and not get_pc().Pawn.IsEnemy(obj):
+        return False
+    if obj.Class._inherits(unrealsdk.find_class("WillowDialogEchoActor")):  # noqa: SIM103
+        return False
+    return True
+
+
+def try_skip(obj: UObject) -> Block | None:
+    return Block if not is_obj_allowed_to_talk(obj) else None
 
 
 @hook("GearboxFramework.Behavior_TriggerDialogEvent:TriggerDialogEvent")
-@hook("GearboxFramework.WillowDialogAct_Talk:Activate")
-@hook("GearboxFramework.GearboxDialogComponent:TriggerEvent")
-def dialog(
+def trigger_dialog_event(
+    _1: UObject,
+    args: WrappedStruct,
+    _3: Any,
+    _4: BoundFunction,
+) -> Block | None:
+    return try_skip(args.ContextObject)
+
+
+@hook("WillowGame.WillowDialogAct_Talk:TalkStarted")
+def activate(
     obj: UObject,
     args: WrappedStruct,
     _3: Any,
     _4: BoundFunction,
 ) -> Block | None:
-    if obj.Class._inherits(
-        unrealsdk.find_class("Behavior_TriggerDialogEvent"),
-    ) and is_obj_allowed_to_talk(
-        args.ContextObject,
-    ):
-        return None
-    if obj.Class._inherits(
-        unrealsdk.find_class("WillowDialogAct_Talk"),
-    ) and is_obj_allowed_to_talk(obj.GetActor()):
-        return None
-    if obj.Class._inherits(
-        unrealsdk.find_class("GearboxDialogComponent"),
-    ) and is_obj_allowed_to_talk(obj.Owner):
-        return None
+    actor = args.InTalker
+    if not is_obj_allowed_to_talk(actor) and hasattr(actor, "DialogComponent"):
+        actor.DialogComponent.StopTalking()
 
-    if not auto_skip_option.value:
-        return None
 
-    return Block
+@hook("GearboxFramework.GearboxDialogComponent:TriggerEvent")
+def trigger_event(
+    obj: UObject,
+    _2: WrappedStruct,
+    _3: Any,
+    _4: BoundFunction,
+) -> Block | None:
+    return try_skip(obj.Owner)
 
 
 build_mod()
