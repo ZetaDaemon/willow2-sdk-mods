@@ -21,3 +21,4 @@ files = [
     "dist/graphviz/backend/*.py",
     "dist/graphviz/parameters/*.py",
 ]
+as_zip = true
