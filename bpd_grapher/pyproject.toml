@@ -14,4 +14,10 @@ license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" 
 download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/bpd_grapher.sdkmod"
 
 [tool.sdkmod_release_script]
-files = ["*.md", "*.py"]
+files = [
+    "*.md",
+    "*.py",
+    "dist/graphviz/*.py",
+    "dist/graphviz/backend/*.py",
+    "dist/graphviz/parameters/*.py",
+]
