@@ -2,9 +2,10 @@ import argparse
 
 import unrealsdk
 from command_extensions.builtins import obj_name_splitter, parse_object
-from drop_loot import drop_loot
 from mods_base import build_mod, command, get_pc
 from unrealsdk.unreal import UFunction, UObject, WrappedStruct
+
+from modder_commands.drop_loot import drop_loot
 
 
 def get_context_from_path(context: UObject, path: str) -> UObject:
