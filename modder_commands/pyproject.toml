@@ -1,0 +1,12 @@
+[project]
+name = "modder_commands"
+version = "1.0"
+authors = [{ name = "ZetaDaemon" }]
+description = """\
+Adds a command to drop items in game.
+The command is `drop_loot {obj} {quantity}`, the obj must be an InventoryBalanceDefinition \
+or ItemPoolDefinition, quantity must be an int, defaults to 1."""
+
+[tool.sdkmod]
+name = "Modder Commands"
+version = "1.0"
