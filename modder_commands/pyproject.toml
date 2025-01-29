@@ -10,3 +10,6 @@ or ItemPoolDefinition, quantity must be an int, defaults to 1."""
 [tool.sdkmod]
 name = "Modder Commands"
 version = "1.0"
+
+[tool.sdkmod_release_script]
+files = ["*.md", "*.py"]
