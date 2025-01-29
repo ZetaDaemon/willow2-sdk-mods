@@ -1,0 +1,17 @@
+[project]
+name = "bpd_grapher"
+version = "1.0"
+authors = [{ name = "ZetaDaemon" }]
+description = "Skips dialog automatically."
+
+[project.urls]
+Changelog = "https://github.com/ZetaDaemon/willow2-sdk-mods/blob/main/bpd_grapher/readme.md#Changelog"
+
+[tool.sdkmod]
+name = "BPD Grapher"
+version = "1.0"
+license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/bpd_grapher.sdkmod"
+
+[tool.sdkmod_release_script]
+files = ["*.md", "*.py"]
