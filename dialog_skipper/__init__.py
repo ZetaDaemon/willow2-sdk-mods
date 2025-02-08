@@ -59,14 +59,18 @@ def trigger_dialog_event(
 
 
 @hook("WillowGame.WillowDialogAct_Talk:TalkStarted")
-def activate(
+def talk_start(
     _1: UObject,
     args: WrappedStruct,
     _3: Any,
     _4: BoundFunction,
 ) -> None:
     actor = args.InTalker
-    if not is_obj_allowed_to_talk(actor) and hasattr(actor, "DialogComponent"):
+    if (
+        auto_skip_option.value
+        and not is_obj_allowed_to_talk(actor)
+        and hasattr(actor, "DialogComponent")
+    ):
         actor.DialogComponent.StopTalking()
 
 
