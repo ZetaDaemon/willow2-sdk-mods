@@ -29,20 +29,23 @@ def skip_dialog() -> None:
         dialog.StopTalking()
 
 
-def is_obj_allowed_to_talk(obj: UObject) -> bool:
+def is_obj_allowed_to_talk(obj: UObject | None) -> bool:
     if skip_all_dialog_option.value:
         return False
     if obj is None:
         return True
-    if obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and not get_pc().Pawn.IsEnemy(obj):
+    player_pawn = get_pc().Pawn
+    if obj.Class._inherits(unrealsdk.find_class("WillowAIPawn")) and (
+        player_pawn is not None and not player_pawn.IsEnemy(obj)
+    ):
         return False
     if obj.Class._inherits(unrealsdk.find_class("WillowDialogEchoActor")):  # noqa: SIM103
         return False
     return True
 
 
-def try_skip(obj: UObject) -> Block | None:
-    return Block if not is_obj_allowed_to_talk(obj) else None
+def try_skip(obj: UObject) -> type[Block] | None:
+    return Block if auto_skip_option.value and not is_obj_allowed_to_talk(obj) else None
 
 
 @hook("GearboxFramework.Behavior_TriggerDialogEvent:TriggerDialogEvent")
@@ -51,17 +54,17 @@ def trigger_dialog_event(
     args: WrappedStruct,
     _3: Any,
     _4: BoundFunction,
-) -> Block | None:
+) -> type[Block] | None:
     return try_skip(args.ContextObject)
 
 
 @hook("WillowGame.WillowDialogAct_Talk:TalkStarted")
 def activate(
-    obj: UObject,
+    _1: UObject,
     args: WrappedStruct,
     _3: Any,
     _4: BoundFunction,
-) -> Block | None:
+) -> None:
     actor = args.InTalker
     if not is_obj_allowed_to_talk(actor) and hasattr(actor, "DialogComponent"):
         actor.DialogComponent.StopTalking()
@@ -73,7 +76,7 @@ def trigger_event(
     _2: WrappedStruct,
     _3: Any,
     _4: BoundFunction,
-) -> Block | None:
+) -> type[Block] | None:
     return try_skip(obj.Owner)
 
 
