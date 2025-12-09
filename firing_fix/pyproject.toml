@@ -2,7 +2,8 @@
 name = "firing_fix"
 version = "1.0"
 authors = [{ name = "ZetaDaemon" }]
-description = "Fixes weapon firing logic to no longer get stuck at 0 ammo."
+description = """Fixes weapon firing logic to no longer get stuck at 0 ammo and weapons not starting firing when swapping while holding fire.
+Each fix can be toggled individually if only wanting one or the other."""
 
 [tool.sdkmod]
 name = "Firing Fix"
