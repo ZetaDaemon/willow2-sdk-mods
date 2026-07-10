@@ -12,6 +12,8 @@ and selecting the customisation."""
 [tool.sdkmod]
 name = "Insta Vehicles"
 version = "1.0"
+license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/insta_vehicles.sdkmod"
 
 [tool.sdkmod_release_script]
 files = ["*.md", "*.py"]
