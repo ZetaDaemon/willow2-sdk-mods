@@ -3,10 +3,11 @@ name = "insta_vehicles"
 version = "1.0"
 authors = [{ name = "ZetaDaemon" }]
 description = """\
-Allows you to instantly spawn a vehicle like bl4. Only works in maps where vehicles are supported \ 
-and based on mission progress.\n\n Vehicle customisation is still handled through the vehicle station. \
-Slot 1 is used for spawning vehicles \
-and selecting the customisation."""
+Allows you to instantly spawn a vehicle like bl4. Only works in maps \
+where vehicles are supported and based on mission progress.
+
+Vehicle customisation is still handled through the vehicle station. \
+Slot 1 is used for spawning vehicles and selecting the customisation."""
 
 [tool.sdkmod]
 name = "Insta Vehicles"
