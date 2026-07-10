@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import unrealsdk
 from mods_base import BoolOption, GroupedOption, SpinnerOption, build_mod, get_pc, hook, keybind
-from unrealsdk.hooks import Block, Type
+from unrealsdk.hooks import Block
 
 from insta_vehicles.ucaching import ObjReferenceByName
 
