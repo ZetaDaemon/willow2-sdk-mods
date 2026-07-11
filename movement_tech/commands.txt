@@ -1,0 +1,43 @@
+clone GD_Weap_AssaultRifle Z_MOVEMENT_TECH_PKG
+
+clone WillowGame.Default__ProjectileDefinition Z_MOVEMENT_TECH_PKG.GrappleProjectile
+clone GD_Weap_AssaultRifle.Projectiles.Projectile_Rocket_Vladof:CylinderComponent_55 Z_MOVEMENT_TECH_PKG.GrappleProjectile:CylinderComponent
+
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile BodyComposition (Attachments=((Data=(Name=,Type=IDT_ActorComponent,Replication=IDR_Server,MaxSwitchValue=0,BitsRequiredForMaxSwitchValue=0,Bool=False,DeleteByOwner=False,Int=0,Float=0.000000,Vector=(X=0.000000,Y=0.000000,Z=0.000000),Object=None,ComponentData=(Component=Z_MOVEMENT_TECH_PKG.GrappleProjectile:CylinderComponent,CollisionType=COLLIDE_CustomDefault,bAttachToMesh=False,bIsUsable=False,bIsSecondaryUsable=False,MeshSocketName=,HitRegionDefinition=None,InteractIcon=None,SecondaryInteractIcon=None),String=,BodyCompositionIndex=2),ParentAttachmentIdentifier="CylinderComponent",AttachmentBaseInstanceDataIndex=-1,SwitchIdentifier=0)),MaxExpectedComponents=0,HasHomingTargetComponents=False)
+
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile:CylinderComponent CollisionHeight 1
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile:CylinderComponent CollisionRadius 1
+
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile PhysicsMode PHYS_Projectile
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile ProjectileType PROJECTILE_TYPE_Unknown
+
+clone GD_Weap_AssaultRifle.Projectiles.Projectile_Rocket_Vladof:BehaviorProviderDefinition_0 Z_MOVEMENT_TECH_PKG.GrappleProjectile:BehaviorProviderDefinition_0
+
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile BehaviorProviderDefinition Z_MOVEMENT_TECH_PKG.GrappleProjectile:BehaviorProviderDefinition_0
+
+clone WillowGame.Default__ProjectileBehavior_SetSpeed Z_MOVEMENT_TECH_PKG.GrappleProjectile:BehaviorProviderDefinition_0.ProjectileBehavior_SetSpeed
+
+set Z_MOVEMENT_TECH_PKG.GrappleProjectile:BehaviorProviderDefinition_0 BehaviorSequences ((BehaviorSequenceName="Default",bEnabledOnSpawn=True,bSequenceEnabledMutex=False,CustomEnableCondition=None,EventData2=((UserData=(EventName="OnHitTheWorld",bEnabled=True,bReplicate=False,MaxTriggerCount=0,ReTriggerDelay=0.000000,FilterObject=None),OutputVariables=(ArrayIndexAndLength=0),OutputLinks=(ArrayIndexAndLength=1)),(UserData=(EventName="OnHitDamagableObject",bEnabled=True,bReplicate=False,MaxTriggerCount=0,ReTriggerDelay=0.000000,FilterObject=None),OutputVariables=(ArrayIndexAndLength=0),OutputLinks=(ArrayIndexAndLength=65537))),BehaviorData2=((Behavior=Z_MOVEMENT_TECH_PKG.GrappleProjectile:BehaviorProviderDefinition_0.ProjectileBehavior_SetSpeed,LinkedVariables=(ArrayIndexAndLength=0),OutputLinks=(ArrayIndexAndLength=0))),VariableData=(),ConsolidatedOutputLinkData=((LinkIdAndLinkedBehavior=0,ActivateDelay=0.000000),(LinkIdAndLinkedBehavior=0,ActivateDelay=0.000000)),ConsolidatedVariableLinkData=(),ConsolidatedLinkedVariables=()))
+
+
+clone WillowGame.Default__Behavior_FireBeam Z_MOVEMENT_TECH_PKG.FireGrappleBeam
+load_package Orchid_ShipGraveyard_Combat
+keep_alive GD_AnchorManShared.FiringModes.FireMode_AnchorBeam
+
+set Z_MOVEMENT_TECH_PKG.FireGrappleBeam bLockTarget True
+set Z_MOVEMENT_TECH_PKG.FireGrappleBeam TargetContext (InstancedDataContextName = ,ContextObject = None,BehaviorContext = BCONTEXT_OtherEventParticipant,bSupportsDefaultOutputLink = 0)
+set Z_MOVEMENT_TECH_PKG.FireGrappleBeam SourceSocket "BeamSource"
+set Z_MOVEMENT_TECH_PKG.FireGrappleBeam TargetSocket "BeamSource"
+set Z_MOVEMENT_TECH_PKG.FireGrappleBeam DamageSource Class'WillowGame.WillowDmgSource_Melee'
+set Z_MOVEMENT_TECH_PKG.FireGrappleBeam FiringModeDefinition GD_AnchorManShared.FiringModes.FireMode_AnchorBeam
+
+
+clone GD_PlayerShared.Anims.WeaponAnim_ThrowGrenade Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim
+clone GD_PlayerShared.Anims1st.WeaponAnim_ThrowGrenade Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim_1st
+clone WillowGame.Default__PlayerBehavior_SpawnCurrentProjectile Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim:PlayerBehavior_SpawnCurrentProjectile
+
+set Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim SMNotifies ((Time=0.500000,PlayServer=True,PlayClient=False,PlayLocal=False,Behaviors=(Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim:PlayerBehavior_SpawnCurrentProjectile)))
+
+set Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim:PlayerBehavior_SpawnCurrentProjectile ProjectileToSpawn Z_MOVEMENT_TECH_PKG.GrappleProjectile
+set Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim:PlayerBehavior_SpawnCurrentProjectile bConsumeResource False
+set Z_MOVEMENT_TECH_PKG.ThrowGrenadeAnim:PlayerBehavior_SpawnCurrentProjectile bSaveProjectileReference False

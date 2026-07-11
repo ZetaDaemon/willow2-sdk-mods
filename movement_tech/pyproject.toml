@@ -1,0 +1,16 @@
+[project]
+name = "movement_tech"
+version = "1.0"
+authors = [{ name = "ZetaDaemon" }]
+description = """\
+Adds double jumps, slams and grappling. There are configurable settings for the slams and grappling."""
+
+[tool.sdkmod]
+name = "Movement Tech"
+supported_games = ["BL2"]
+version = "1.0"
+license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/movement_tech.sdkmod"
+
+[tool.sdkmod_release_script]
+files = ["*.md", "*.py", "txt"]
