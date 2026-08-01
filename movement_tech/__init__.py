@@ -7,16 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import uemath
 import unrealsdk
-from mods_base import (
-    BoolOption,
-    NestedOption,
-    SliderOption,
-    ValueOption,
-    build_mod,
-    get_pc,
-    hook,
-    keybind,
-)
+from mods_base import BoolOption, NestedOption, SliderOption, build_mod, get_pc, hook, keybind
 from networking import add_network_functions, host
 from unrealsdk.hooks import Block, Type
 from unrealsdk.unreal import WeakPointer
@@ -47,16 +38,35 @@ else:
 
 
 @dataclass
+class ScaledSlider(SliderOption):
+    """Slider option that allows for getting a scaled version of the value."""
+
+    scale: float = 1
+
+    @property
+    def scaled_value(self) -> float:
+        """Access value with scaling.
+
+        Allows the internal value which is displayed in the menus to have a different scale
+        to the value used.
+        """
+        return self.value * self.scale
+
+    @scaled_value.setter
+    def scaled_value(self, value: float) -> None:
+        value /= self.scale
+        if self.is_integer:
+            value = round(value)
+        self.value = value
+
+
+@dataclass
 class PlayerInfo:
     """Store movement tech info for players."""
 
     can_double_jump: bool = True
     grapple_projectile: WeakPointer[WillowProjectile] | None = None
     grapple_duration_remaining: float = 0
-
-
-def get_value_in_cm(option: ValueOption[float]) -> float:
-    return option.value * 100
 
 
 COMMANDS_FILE_NAME = "commands.txt"
@@ -70,27 +80,29 @@ PLAYERS: dict[int, PlayerInfo] = {}
 DOUBLEJUMP_ENABLED = BoolOption("Double Jump Enabled", True)
 
 SLAM_ENABLED = BoolOption("Slam Enabled", True)
-SLAM_Z_VELOCITY = SliderOption(
-    "Slam Speed", -2000, -10000, -500, -500, description="The speed in m/s d to slam. Default -20"
+SLAM_Z_VELOCITY = ScaledSlider(
+    "Slam Speed", 20, 5, 100, 5, scale=-100, description="The speed in m/s d to slam. Default 20"
 )
 SLAM_OPTIONS = NestedOption("Slam Configuration", [SLAM_Z_VELOCITY])
 
 
 GRAPPLE_ENABLED = BoolOption("Grapple Enabled", True)
-GRAPPLE_PROJECTILE_SPEED = SliderOption(
+GRAPPLE_PROJECTILE_SPEED = ScaledSlider(
     "Grapple Hook Speed",
     200,
     50,
     500,
     50,
+    scale=100,
     description="The speed in m/s d of the grappling hook thrown out. Default 200",
 )
-GRAPPLE_PULL_STRENGTH = SliderOption(
+GRAPPLE_PULL_STRENGTH = ScaledSlider(
     "Grapple Pull Strength",
     20,
     5,
     50,
     5,
+    scale=100,
     description="The speed  in m/s you're pulled towards where the grapple landed. Default 20",
 )
 GRAPPLE_DURATION = SliderOption(
@@ -100,20 +112,22 @@ GRAPPLE_DURATION = SliderOption(
     10,
     description="The amount of seconds before the grapple automatically ends. Default 3",
 )
-GRAPPLE_MIN_DISTANCE = SliderOption(
+GRAPPLE_MIN_DISTANCE = ScaledSlider(
     "Grapple Min Distance",
     3,
     1,
     10,
     1,
+    scale=100,
     description="Distance in meters where the grapple stops. Default 5",
 )
-GRAPPLE_MAX_DISTANCE = SliderOption(
+GRAPPLE_MAX_DISTANCE = ScaledSlider(
     "Grapple Max Distance",
     60,
     10,
     100,
     10,
+    scale=100,
     description="Distance in meters for the maximum grapple range. Default 60",
 )
 GRAPPLE_OPTIONS = NestedOption(
@@ -171,28 +185,29 @@ def lookup_player_info(pc: WillowPlayerController) -> PlayerInfo:
 
 @hook("WillowGame.WillowPlayerPawn:CanJump")
 def can_jump(
-    player_pawn: WillowPlayerPawn,
-    _2: WillowPlayerPawn._CanJump.args,
-    _3: WillowPlayerPawn._CanJump.ret,
-    func: WillowPlayerPawn._CanJump,
+    pawn: WillowPlayerPawn,
+    _2: WillowPlayerPawn.CanJump.args,
+    _3: WillowPlayerPawn.CanJump.ret,
+    func: WillowPlayerPawn.CanJump,
 ) -> tuple[type[Block], bool] | None:
-    physics = player_pawn.Physics
-    info = lookup_player_info(player_pawn.Controller)
+    physics = pawn.Physics
+    info = lookup_player_info(pawn.Controller)
 
-    if physics != EPhysics.PHYS_Falling:
-        return None
     if not info.can_double_jump:
         return None
-
-    player_pawn.Physics = EPhysics.PHYS_Walking
-    can_jump.disable()
-    if func():
-        player_pawn.Physics = physics
-        info.can_double_jump = False
-        can_jump.enable()
+    if physics != EPhysics.PHYS_Falling:
+        # Only need to override the can jump logic if in the air for a double jump.
+        return None
+    # Now check all the other normal jump restrictions
+    if pawn.PlayerReplicationInfo.bGFxMenuOpen == 1:
+        return None
+    if pawn.Controller.bStopgapBlockForDeferredMovies:
+        return None
+    # Don't need the normal jump physics check as we know we're falling from earlier.
+    if (pawn.bJumpCapable and pawn.CanStuckJump()) or (
+        not pawn.bIsCrouched and not pawn.bWantsToCrouch
+    ):
         return Block, True
-    can_jump.enable()
-    player_pawn.Physics = physics
     return None
 
 
@@ -209,7 +224,7 @@ def request_slam() -> None:
     ).Pawn
     if pawn.Physics != EPhysics.PHYS_Falling:
         return
-    pawn.Velocity.Z += get_value_in_cm(SLAM_Z_VELOCITY)
+    pawn.Velocity.Z += SLAM_Z_VELOCITY.scaled_value
 
 
 @hook("WillowGame.WillowPlayerInput:DuckPressed")
@@ -236,7 +251,7 @@ def try_grapple() -> None:
 @hook("WillowGame.WillowPlayerController:Behavior_SpawnCurrentProjectile", Type.POST)
 def spawn_projectile(
     pc: WillowPlayerController,
-    args: WillowPlayerController._Behavior_SpawnCurrentProjectile.args,
+    args: WillowPlayerController.Behavior_SpawnCurrentProjectile.args,
     ret: WillowProjectile,
     *_: Any,
 ) -> None:
@@ -249,8 +264,7 @@ def spawn_projectile(
     pawn = pc.Pawn
     projectile = ret
     forward = uemath.Vector(pc.Rotation) * 50
-
-    projectile.MaxSpeed = get_value_in_cm(GRAPPLE_PROJECTILE_SPEED)
+    projectile.MaxSpeed = GRAPPLE_PROJECTILE_SPEED.scaled_value
     projectile.SetVelocityAndAcceleration((forward).normalize().to_ue_vector())
     info.grapple_projectile = WeakPointer(projectile)
 
@@ -268,12 +282,12 @@ def spawn_projectile(
         projectile,
         unrealsdk.make_struct("BehaviorParameters"),
     )
-    info.grapple_duration_remaining += get_value_in_cm(GRAPPLE_DURATION)
+    info.grapple_duration_remaining += GRAPPLE_DURATION.value
 
 
 @hook("WillowGame.WillowPlayerController:PlayerTick")
 def player_tick(
-    pc: WillowPlayerController, args: WillowPlayerController._PlayerTick.args, *_: Any
+    pc: WillowPlayerController, args: WillowPlayerController.PlayerTick.args, *_: Any
 ) -> None:
     pawn = pc.Pawn
     info = lookup_player_info(pc)
@@ -285,8 +299,8 @@ def player_tick(
     distance = abs(target_location.distance(location))
     if (
         info.grapple_duration_remaining <= 0
-        or distance > get_value_in_cm(GRAPPLE_MAX_DISTANCE)
-        or (projectile.MaxSpeed <= 0 and distance < get_value_in_cm(GRAPPLE_MIN_DISTANCE))
+        or distance > GRAPPLE_MAX_DISTANCE.scaled_value
+        or (projectile.MaxSpeed <= 0 and distance < GRAPPLE_MIN_DISTANCE.scaled_value)
     ):
         pawn.CustomGravityScaling = 1
         info.grapple_projectile = None
@@ -305,7 +319,7 @@ def player_tick(
         pawn.Velocity.Z = pawn.JumpZ
         pawn.Physics = EPhysics.PHYS_Falling
     pawn.Velocity = (
-        uemath.Vector(pawn.Velocity) + direction * get_value_in_cm(GRAPPLE_PULL_STRENGTH)
+        uemath.Vector(pawn.Velocity) + direction * GRAPPLE_PULL_STRENGTH.scaled_value
     ).to_ue_vector()
     return
 
