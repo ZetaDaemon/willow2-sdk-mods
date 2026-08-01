@@ -7,7 +7,16 @@ from typing import TYPE_CHECKING, Any, cast
 
 import uemath
 import unrealsdk
-from mods_base import BoolOption, NestedOption, SliderOption, build_mod, get_pc, hook, keybind
+from mods_base import (
+    ENGINE,
+    BoolOption,
+    NestedOption,
+    SliderOption,
+    build_mod,
+    get_pc,
+    hook,
+    keybind,
+)
 from networking import add_network_functions, host
 from unrealsdk.hooks import Block, Type
 from unrealsdk.unreal import WeakPointer
@@ -15,26 +24,28 @@ from unrealsdk.unreal import WeakPointer
 from movement_tech.ucaching import ObjReferenceByName
 
 if TYPE_CHECKING:
-    from bl2.Core import Object  # pyright: ignore[reportMissingModuleSource]
-    from bl2.Engine import Actor, BehaviorBase  # pyright: ignore[reportMissingModuleSource]
+    from bl2.Core import Object
+    from bl2.Engine import Actor, BehaviorBase, WorldInfo
     from bl2.WillowGame import (
-        Behavior_FireBeam,  # pyright: ignore[reportMissingModuleSource]
-        ProjectileDefinition,  # pyright: ignore[reportMissingModuleSource]
-        SpecialMove_WeaponAction,  # pyright: ignore[reportMissingModuleSource]
-        WillowPlayerController,  # pyright: ignore[reportMissingModuleSource]
-        WillowPlayerPawn,  # pyright: ignore[reportMissingModuleSource]
-        WillowPlayerReplicationInfo,  # pyright: ignore[reportMissingModuleSource]
-        WillowProjectile,  # pyright: ignore[reportMissingModuleSource]
+        Behavior_FireBeam,
+        ProjectileDefinition,
+        SpecialMove_WeaponAction,
+        WillowPlayerController,
+        WillowPlayerPawn,
+        WillowPlayerReplicationInfo,
+        WillowProjectile,
     )
 
     EPhysics = Actor.EPhysics
     EInputEvent = Object.EInputEvent
     EBehaviorContext = BehaviorBase.EBehaviorContext
+    ENetMode = WorldInfo.ENetMode
 
 else:
     EPhysics = unrealsdk.find_enum("EPhysics")
     EInputEvent = unrealsdk.find_enum("EInputEvent")
     EBehaviorContext = unrealsdk.find_enum("EBehaviorContext")
+    ENetMode = unrealsdk.find_enum("ENetMode")
 
 
 @dataclass
@@ -161,6 +172,10 @@ def setup_objects() -> None:
     get_pc().ConsoleCommand(f"exec {COMMANDS_FILE_PATH!s}")
 
 
+def is_standalone() -> bool:
+    return ENGINE.GetCurrentWorldInfo().NetMode == ENetMode.NM_Standalone
+
+
 @hook("WillowGame.FrontendGFxMovie:Start", Type.POST_UNCONDITIONAL, immediately_enable=True)
 def frontend_start(*_: Any) -> None:
     frontend_start.disable()
@@ -184,12 +199,7 @@ def lookup_player_info(pc: WillowPlayerController) -> PlayerInfo:
 
 
 @hook("WillowGame.WillowPlayerPawn:CanJump")
-def can_jump(
-    pawn: WillowPlayerPawn,
-    _2: WillowPlayerPawn.CanJump.args,
-    _3: WillowPlayerPawn.CanJump.ret,
-    func: WillowPlayerPawn.CanJump,
-) -> tuple[type[Block], bool] | None:
+def can_jump(pawn: WillowPlayerPawn, *_: Any) -> tuple[type[Block], bool] | None:
     physics = pawn.Physics
     info = lookup_player_info(pawn.Controller)
 
@@ -207,6 +217,7 @@ def can_jump(
     if (pawn.bJumpCapable and pawn.CanStuckJump()) or (
         not pawn.bIsCrouched and not pawn.bWantsToCrouch
     ):
+        info.can_double_jump = False
         return Block, True
     return None
 
@@ -234,6 +245,8 @@ def duck_pressed(*_: Any) -> None:
 
 @keybind("Grapple", event_filter=EInputEvent.IE_Pressed)
 def try_grapple() -> None:
+    if not is_standalone():
+        return
     pc: WillowPlayerController = get_pc()
     info = lookup_player_info(pc)
     if not pc.CanPerformWeaponAction():
@@ -255,6 +268,8 @@ def spawn_projectile(
     ret: WillowProjectile,
     *_: Any,
 ) -> None:
+    if not is_standalone():
+        return
     if ret is None:
         return
     if args.CurrentProjectile != PROJEECTILE_DEF():
@@ -289,6 +304,8 @@ def spawn_projectile(
 def player_tick(
     pc: WillowPlayerController, args: WillowPlayerController.PlayerTick.args, *_: Any
 ) -> None:
+    if not is_standalone():
+        return
     pawn = pc.Pawn
     info = lookup_player_info(pc)
     if info.grapple_projectile is None or (projectile := info.grapple_projectile()) is None:
