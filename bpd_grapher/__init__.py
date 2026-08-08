@@ -1,23 +1,35 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import math
 import site
 import struct
+import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+import bpd_vars
 import unrealsdk
 from command_extensions.builtins import obj_name_splitter
-from mods_base import build_mod, command
+from mods_base import SETTINGS_DIR, build_mod, command
 from unrealsdk.unreal import UObject, WrappedStruct
 
-site.addsitedir(str(Path(__file__).parent.absolute() / "dist"))
+from bpd_grapher import dump_bpd
 
-import graphviz  # noqa: E402
+from . import graphviz
+
+importlib.reload(dump_bpd)
 
 if TYPE_CHECKING:
+    from bl2.Engine import AttributeInitializationDefinition
     from bl2.GearboxFramework import BehaviorProviderDefinition
+
+    EBaseValueMode = AttributeInitializationDefinition.EBaseValueMode
+    EnumBehaviorVariableType = BehaviorProviderDefinition.EBehaviorVariableType
+else:
+    EBaseValueMode = unrealsdk.find_enum("EBaseValueMode")
+    EnumBehaviorVariableType = unrealsdk.find_enum("EBehaviorVariableType")
 
 EBehaviorVariableLinkType = ["Unknown", "Context", "Input", "Output", "MAX"]
 BLANK_NAME = '" "'
@@ -90,7 +102,15 @@ def parse_linkidandlinkedbehavior(number: int) -> tuple[int, int]:
     return (linkid, behavior)
 
 
-def additional_behaviour_data(behaviour: UObject) -> str:  # noqa: C901, PLR0911, PLR0912
+def isfloat(string: str) -> bool:
+    try:
+        float(string)
+    except ValueError:
+        return False
+    return True
+
+
+def additional_behaviour_data(behaviour: UObject) -> str:  # noqa: PLR0911, PLR0912, PLR0915
     if behaviour.Class.Name == "Behavior_ActivateSkill" and behaviour.SkillToActivate:
         return f"\n{try_get_pathname(behaviour.SkillToActivate)}"
 
@@ -136,19 +156,70 @@ def additional_behaviour_data(behaviour: UObject) -> str:  # noqa: C901, PLR0911
         return a + b + c
 
     if behaviour.Class.Name == "Behavior_ModifyTimer":
-        behavior_timer_function = [
-            "None",
-            "Start",
-            "Pause",
-            "Toggle",
-            "Resume",
-            "Stop",
-            "MAX",
-        ]
+        behavior_timer_function = ["None", "Start", "Pause", "Toggle", "Resume", "Stop", "MAX"]
         return f"\nTimer_{behaviour.TimerId} {behavior_timer_function[behaviour.Operation]}"
 
     if behaviour.Class.Name == "Behavior_CallFunction":
         return f"\n{behaviour.FunctionName}"
+
+    if behaviour.Class.Name == "Behavior_CompareValues":
+        a = f"{round(behaviour.ValueA.BaseValueConstant, 2)}"
+        a_attr = behaviour.ValueA.BaseValueAttribute
+        a_init = behaviour.ValueA.InitializationDefinition
+        a_scale = round(behaviour.ValueA.BaseValueScaleConstant, 2)
+
+        if a_attr is not None:
+            a = a_attr.Name
+
+        if a_init is not None:
+            if a_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefSetsBaseValue:
+                a: str = a_init.Name
+            elif a_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefScalesBaseValue:
+                a = f"{a} x {a_init.Name}"
+            elif a_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefAddsToBaseValue:
+                a = f"{a} + {a_init.Name}"
+            elif (
+                a_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefOffsetByBaseValue
+            ):
+                return ""
+
+        if a_scale != 1:
+            if isfloat(a):
+                a = f"{round(float(a) * behaviour.ValueA.BaseValueScaleConstant, 2)}"
+            elif "+" in a:
+                a = f"({a}) x {a_scale}"
+            else:
+                a = f"{a} x {a_scale}"
+
+        b = f"{round(behaviour.ValueB.BaseValueConstant, 2)}"
+        b_attr = behaviour.ValueB.BaseValueAttribute
+        b_init = behaviour.ValueB.InitializationDefinition
+        b_scale = round(behaviour.ValueB.BaseValueScaleConstant, 2)
+
+        if b_attr is not None:
+            b = b_attr.Name
+
+        if b_init is not None:
+            if b_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefSetsBaseValue:
+                b: str = b_init.Name
+            elif b_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefScalesBaseValue:
+                b = f"{a} x {b_init.Name}"
+            elif b_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefAddsToBaseValue:
+                b = f"{a} + {b_init.Name}"
+            elif (
+                b_init.BaseValueMode == EBaseValueMode.BASEVALUE_InitializationDefOffsetByBaseValue
+            ):
+                return ""
+
+        if b_scale != 1:
+            if isfloat(b):
+                b = f"{round(float(b) * behaviour.ValueA.BaseValueScaleConstant, 2)}"
+            elif "+" in b:
+                b = f"({b}) x {b_scale}"
+            else:
+                b = f"{b} x {b_scale}"
+
+        return f"\nA= {a}\nB= {b}"
 
     return ""
 
@@ -167,6 +238,18 @@ def additional_behaviour_link_data(from_behavior: UObject, id: int) -> str:  # n
             return "<"
         if id == 4:
             return ">="
+    if from_behavior.Class.Name == "Behavior_CompareFloat":
+        if id == 0:
+            return "<"
+        if id == 1:
+            return "=="
+        if id == 2:
+            return ">"
+    if from_behavior.Class.Name == "Behavior_CompareBool":
+        if id == 0:
+            return "True"
+        if id == 1:
+            return "False"
     return ""
 
 
@@ -176,9 +259,25 @@ def get_behaviour_name(behaviour: UObject, idx: int, sidx: int) -> str:
     return name
 
 
-def get_variable_data(
+def get_variable_value_info(
     behavior_sequence: BehaviorProviderDefinition.BehaviorSequenceData,
-    linked_variables: int,
+    variable_data: BehaviorProviderDefinition.BehaviorVariableData,
+) -> str:
+    data = bpd_vars.bpd_vars_native.get_behavior_variable_data(variable_data)
+    if data is None:
+        ""
+    match variable_data.Type:
+        case EnumBehaviorVariableType.BVAR_Attribute:
+            data = cast("bpd_vars.bpd_vars_native.BVAttributeData", data)
+            ail = cast(
+                "BehaviorProviderDefinition.SubarrayData", data.ContextVariable
+            ).ArrayIndexAndLength
+            return f"ContextVariable: , Value: {data.Value}"
+    return f" {data}"
+
+
+def get_variable_data(
+    behavior_sequence: BehaviorProviderDefinition.BehaviorSequenceData, linked_variables: int
 ) -> str:
     data = ""
     idx, length = parse_arrayindexandlength(linked_variables)
@@ -201,11 +300,15 @@ def get_variable_data(
             except IndexError:
                 msg = f"Index {v_index} is out of range for VariableData"
                 raise BpdError(msg)
+            d_name = d.Name if d.Name != "None" else ""
             data += str(
-                f"[{behavior_sequence.ConsolidatedLinkedVariables[v]}]{d.Name}"
-                f"({EBehaviorVariableType[d.Type]}) "
+                f"[{behavior_sequence.ConsolidatedLinkedVariables[v]}]{d_name}"
+                f"({EBehaviorVariableType[d.Type]}"
+                f"{get_variable_value_info(behavior_sequence, d)}) "
             )
-        data += f"via [{var}]{link_data.PropertyName} ({link_data.ConnectionIndex})"
+        data += f"via [{var}]{link_data.PropertyName}"
+
+        data += f" ({link_data.ConnectionIndex})" if link_data.ConnectionIndex != 0 else ""
     return data
 
 
@@ -221,27 +324,25 @@ def get_event_name(
     )
 
 
-def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> graphviz.Digraph:  # noqa: PLR0912, C901
+def generate_graph(
+    behavior_provider_definition: BehaviorProviderDefinition,
+) -> graphviz.Digraph | None:
     dot = graphviz.Digraph()
     dot.edge_attr.update(arrowhead="vee")
     dot.body.append(
         f"""    labelloc="t";
-		label="{behavior_provider_definition._path_name()}";\n""",
+		label="{behavior_provider_definition._path_name()}";\n"""
     )
     for behavior_sequence_idx, behavior_sequence in enumerate(
         behavior_provider_definition.BehaviorSequences
     ):
         for event_data_idx, event_data in enumerate(behavior_sequence.EventData2):
             event_info = get_event_name(
-                behavior_sequence,
-                event_data,
-                behavior_sequence_idx,
-                event_data_idx,
+                behavior_sequence, event_data, behavior_sequence_idx, event_data_idx
             )
             try:
                 event_info += get_variable_data(
-                    behavior_sequence,
-                    event_data.OutputVariables.ArrayIndexAndLength,
+                    behavior_sequence, event_data.OutputVariables.ArrayIndexAndLength
                 )
             except BpdError as e:
                 unrealsdk.logging.error(f"Error for event:\n{event_data}")
@@ -249,10 +350,7 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
                 return None
             dot.node(
                 get_event_name(
-                    behavior_sequence,
-                    event_data,
-                    behavior_sequence_idx,
-                    event_data_idx,
+                    behavior_sequence, event_data, behavior_sequence_idx, event_data_idx
                 ),
                 event_info,
                 shape="box",
@@ -267,20 +365,23 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
             full_name = full_name.replace(try_get_pathname(behavior_data.Behavior.Outer), "")[1:]
 
             behavior_info = get_behaviour_name(
-                behavior_data.Behavior,
-                behavior_data_idx,
-                behavior_sequence_idx,
+                behavior_data.Behavior, behavior_data_idx, behavior_sequence_idx
             )
-            behavior_info += get_variable_data(
-                behavior_sequence,
-                behavior_data.LinkedVariables.ArrayIndexAndLength,
-            )
+            try:
+                behavior_info += get_variable_data(
+                    behavior_sequence, behavior_data.LinkedVariables.ArrayIndexAndLength
+                )
+            except BpdError as e:
+                unrealsdk.logging.error(
+                    f"Error for behavior:\n[{behavior_data_idx}]{behavior_data}"
+                )
+                unrealsdk.logging.error(e)
+                return None
+
             if behavior_data.Behavior.Class.Name in REMOTE_EVENT_CLASSES:
                 dot.node(
                     get_behaviour_name(
-                        behavior_data.Behavior,
-                        behavior_data_idx,
-                        behavior_sequence_idx,
+                        behavior_data.Behavior, behavior_data_idx, behavior_sequence_idx
                     ),
                     behavior_info,
                     shape="cds",
@@ -291,9 +392,7 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
             else:
                 dot.node(
                     get_behaviour_name(
-                        behavior_data.Behavior,
-                        behavior_data_idx,
-                        behavior_sequence_idx,
+                        behavior_data.Behavior, behavior_data_idx, behavior_sequence_idx
                     ),
                     behavior_info,
                     shape="box",
@@ -303,10 +402,10 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
             idx, length = parse_arrayindexandlength(event_data.OutputLinks.ArrayIndexAndLength)
             for i, link in enumerate(list(range(idx, idx + length))):
                 link_id, idx = parse_linkidandlinkedbehavior(
-                    behavior_sequence.ConsolidatedOutputLinkData[link].LinkIdAndLinkedBehavior,
+                    behavior_sequence.ConsolidatedOutputLinkData[link].LinkIdAndLinkedBehavior
                 )
                 rounded_delay = simple_round(
-                    behavior_sequence.ConsolidatedOutputLinkData[link].ActivateDelay,
+                    behavior_sequence.ConsolidatedOutputLinkData[link].ActivateDelay
                 )
                 delay = (
                     ""
@@ -315,15 +414,10 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
                 )
                 dot.edge(
                     get_event_name(
-                        behavior_sequence,
-                        event_data,
-                        behavior_sequence_idx,
-                        event_data_idx,
+                        behavior_sequence, event_data, behavior_sequence_idx, event_data_idx
                     ),
                     get_behaviour_name(
-                        behavior_sequence.BehaviorData2[idx].Behavior,
-                        idx,
-                        behavior_sequence_idx,
+                        behavior_sequence.BehaviorData2[idx].Behavior, idx, behavior_sequence_idx
                     ),
                     label=f"[{i}] ({link_id},{idx}){delay}",
                 )
@@ -333,10 +427,10 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
             idx, length = parse_arrayindexandlength(behavior_data.OutputLinks.ArrayIndexAndLength)
             for i, link in enumerate(list(range(idx, idx + length))):
                 link_id, idx = parse_linkidandlinkedbehavior(
-                    behavior_sequence.ConsolidatedOutputLinkData[link].LinkIdAndLinkedBehavior,
+                    behavior_sequence.ConsolidatedOutputLinkData[link].LinkIdAndLinkedBehavior
                 )
                 rounded_delay = simple_round(
-                    behavior_sequence.ConsolidatedOutputLinkData[link].ActivateDelay,
+                    behavior_sequence.ConsolidatedOutputLinkData[link].ActivateDelay
                 )
                 delay = (
                     ""
@@ -347,18 +441,14 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
                     continue
                 dot.edge(
                     get_behaviour_name(
-                        behavior_data.Behavior,
-                        behavior_data_idx,
-                        behavior_sequence_idx,
+                        behavior_data.Behavior, behavior_data_idx, behavior_sequence_idx
                     ),
                     get_behaviour_name(
-                        behavior_sequence.BehaviorData2[idx].Behavior,
-                        idx,
-                        behavior_sequence_idx,
+                        behavior_sequence.BehaviorData2[idx].Behavior, idx, behavior_sequence_idx
                     ),
                     label=(
                         f"[{i}] ({link_id},{idx}){delay} "
-                        f"{additional_behaviour_link_data(behavior_data.Behavior,link_id)}"
+                        f"{additional_behaviour_link_data(behavior_data.Behavior, link_id)}"
                     ),
                 )
     return dot
@@ -368,9 +458,12 @@ def generate_graph(behavior_provider_definition: BehaviorProviderDefinition) -> 
 def graph_bpd(args: argparse.Namespace) -> None:
     dot = generate_graph(unrealsdk.find_object("BehaviorProviderDefinition", args.bpd))
     if dot:
-        dot.render(filename="bpd", directory=Path(__file__).parent, view=True)
+        dot.render(
+            filename="bpd", format="pdf", directory=SETTINGS_DIR / "bpds", view=not args.no_view
+        )
 
 
 graph_bpd.add_argument("bpd")
+graph_bpd.add_argument("--no_view", action="store_true")
 
-build_mod()
+build_mod(commands=[graph_bpd, dump_bpd.dump_bpd])
