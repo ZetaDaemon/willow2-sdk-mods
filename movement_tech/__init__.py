@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+# Nothing from CE is directly used in python, but clone commands are used.
+import command_extensions  # noqa: F401
 import uemath
 import unrealsdk
 from mods_base import (
