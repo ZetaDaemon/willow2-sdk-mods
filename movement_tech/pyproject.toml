@@ -5,6 +5,7 @@ authors = [{ name = "ZetaDaemon" }]
 description = """\
 Adds double jumps, slams and grappling. There are configurable settings for the slams and grappling.
 Grappling is disabled in coop."""
+dependencies = ["command_extensions", "uemath"]
 
 [tool.sdkmod]
 name = "Movement Tech"
