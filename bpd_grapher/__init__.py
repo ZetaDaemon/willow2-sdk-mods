@@ -3,9 +3,8 @@ from __future__ import annotations
 import argparse
 import importlib
 import math
-import site
 import struct
-import webbrowser
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -17,7 +16,8 @@ from unrealsdk.unreal import UObject, WrappedStruct
 
 from bpd_grapher import dump_bpd
 
-from . import graphviz
+sys.path.append(str(Path(__file__).parent))
+from bpd_grapher import graphviz
 
 importlib.reload(dump_bpd)
 
