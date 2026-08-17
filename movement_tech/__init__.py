@@ -98,7 +98,6 @@ SLAM_Z_VELOCITY = ScaledSlider(
 SLAM_OPTIONS = NestedOption("Slam Configuration", [SLAM_Z_VELOCITY])
 
 
-GRAPPLE_ENABLED = BoolOption("Grapple Enabled", True)
 GRAPPLE_PROJECTILE_SPEED = ScaledSlider(
     "Grapple Hook Speed",
     200,
@@ -176,10 +175,6 @@ def setup_objects() -> None:
             pc.ConsoleCommand(line)
 
 
-def is_standalone() -> bool:
-    return ENGINE.GetCurrentWorldInfo().NetMode == ENetMode.NM_Standalone
-
-
 @hook("WillowGame.FrontendGFxMovie:Start", Type.POST_UNCONDITIONAL, immediately_enable=True)
 def frontend_start(*_: Any) -> None:
     frontend_start.disable()
@@ -204,6 +199,8 @@ def lookup_player_info(pc: WillowPlayerController) -> PlayerInfo:
 
 @hook("WillowGame.WillowPlayerPawn:CanJump")
 def can_jump(pawn: WillowPlayerPawn, *_: Any) -> tuple[type[Block], bool] | None:
+    if not DOUBLEJUMP_ENABLED.value:
+        return None
     physics = pawn.Physics
     info = lookup_player_info(pawn.Controller)
 
@@ -244,13 +241,13 @@ def request_slam() -> None:
 
 @hook("WillowGame.WillowPlayerInput:DuckPressed")
 def duck_pressed(*_: Any) -> None:
+    if not SLAM_ENABLED.value:
+        return
     request_slam()
 
 
 @keybind("Grapple", event_filter=EInputEvent.IE_Pressed)
 def try_grapple() -> None:
-    if not is_standalone():
-        return
     pc: WillowPlayerController = get_pc()
     info = lookup_player_info(pc)
     if not pc.CanPerformWeaponAction():
@@ -272,8 +269,6 @@ def spawn_projectile(
     ret: WillowProjectile,
     *_: Any,
 ) -> None:
-    if not is_standalone():
-        return
     if ret is None:
         return
     if args.CurrentProjectile != PROJEECTILE_DEF():
@@ -308,8 +303,6 @@ def spawn_projectile(
 def player_tick(
     pc: WillowPlayerController, args: WillowPlayerController.PlayerTick.args, *_: Any
 ) -> None:
-    if not is_standalone():
-        return
     pawn = pc.Pawn
     info = lookup_player_info(pc)
     if info.grapple_projectile is None or (projectile := info.grapple_projectile()) is None:
@@ -346,7 +339,5 @@ def player_tick(
 
 
 _mod_instance = add_network_functions(
-    build_mod(
-        options=[DOUBLEJUMP_ENABLED, SLAM_ENABLED, GRAPPLE_ENABLED, SLAM_OPTIONS, GRAPPLE_OPTIONS]
-    )
+    build_mod(options=[DOUBLEJUMP_ENABLED, SLAM_ENABLED, SLAM_OPTIONS, GRAPPLE_OPTIONS])
 )
