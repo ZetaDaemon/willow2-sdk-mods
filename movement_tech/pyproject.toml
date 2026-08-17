@@ -15,4 +15,4 @@ license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" 
 download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/movement_tech.sdkmod"
 
 [tool.sdkmod_release_script]
-files = ["*.md", "*.py", ".txt"]
+files = ["*.md", "*.py", "*.txt"]
