@@ -18,6 +18,7 @@ from mods_base import (
     get_pc,
     hook,
     keybind,
+    open_in_mod_dir,
 )
 from networking import add_network_functions, host
 from unrealsdk.hooks import Block, Type
@@ -82,10 +83,8 @@ class PlayerInfo:
     grapple_duration_remaining: float = 0
 
 
-COMMANDS_FILE_NAME = "commands.txt"
-COMMANDS_FILE_PATH = (Path(__file__).parent / COMMANDS_FILE_NAME).relative_to(
-    Path(sys.executable).parent.parent, walk_up=True
-)
+COMMANDS_FILE_NAME = "./commands.txt"
+COMMANDS_FILE_PATH = Path(__file__).parent / COMMANDS_FILE_NAME
 
 PLAYERS: dict[int, PlayerInfo] = {}
 
@@ -171,7 +170,10 @@ SPECIAL_MOVE_1ST: ObjReferenceByName[SpecialMove_WeaponAction] = ObjReferenceByN
 
 
 def setup_objects() -> None:
-    get_pc().ConsoleCommand(f"exec {COMMANDS_FILE_PATH!s}")
+    pc = get_pc()
+    with open_in_mod_dir(COMMANDS_FILE_PATH) as file:
+        for line in file.readlines():
+            pc.ConsoleCommand(line)
 
 
 def is_standalone() -> bool:
