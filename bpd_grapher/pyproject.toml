@@ -17,7 +17,7 @@ download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nig
 files = [
     "*.md",
     "*.py",
-    "dist/graphviz/*.py",
-    "dist/graphviz/backend/*.py",
-    "dist/graphviz/parameters/*.py",
+    "graphviz/*.py",
+    "graphviz/backend/*.py",
+    "graphviz/parameters/*.py",
 ]
