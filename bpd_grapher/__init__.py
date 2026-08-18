@@ -5,21 +5,24 @@ import importlib
 import math
 import struct
 import sys
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-import bpd_vars
 import unrealsdk
 from command_extensions.builtins import obj_name_splitter
 from mods_base import SETTINGS_DIR, build_mod, command
-from unrealsdk.unreal import UObject, WrappedStruct
+from unrealsdk.unreal import UObject
 
-from bpd_grapher import dump_bpd
+try:
+    from bpd_grapher import dump_bpd
+
+    importlib.reload(dump_bpd)
+except:
+    dump_bpd = None
 
 sys.path.append(str(Path(__file__).parent))
 from bpd_grapher import graphviz
-
-importlib.reload(dump_bpd)
 
 if TYPE_CHECKING:
     from bl2.Engine import AttributeInitializationDefinition
@@ -27,9 +30,60 @@ if TYPE_CHECKING:
 
     EBaseValueMode = AttributeInitializationDefinition.EBaseValueMode
     EnumBehaviorVariableType = BehaviorProviderDefinition.EBehaviorVariableType
+
 else:
     EBaseValueMode = unrealsdk.find_enum("EBaseValueMode")
     EnumBehaviorVariableType = unrealsdk.find_enum("EBehaviorVariableType")
+
+
+class EBinaryMathOperation(IntEnum):
+    BoolBool_XNOR = 2
+    BoolBool_AND = 3
+    BoolBool_OR = 4
+    BoolBool_XOR = 5
+    FloatFloat_Equal = 6
+    FloatFloat_Greater = 7
+    FloatFloat_GreaterEqual = 8
+    FloatFloat_Less = 9
+    FloatFloat_LessEqual = 10
+    FloatFloat_NotEqual = 11
+    IntInt_Equal = 12
+    IntInt_Less = 13
+    IntInt_LessEqual = 14
+    IntInt_Greater = 15
+    IntInt_GreaterEqual = 16
+    IntInt_NotEqual = 17
+    ObjectObject_Equal = 18
+    ObjectObject_NotEqual = 19
+    IntInt_Add = 1000002
+    IntInt_Subtract = 1000003
+    IntInt_Mult = 1000004
+    IntInt_Divide = 1000005
+    IntInt_Power = 1000006
+    IntInt_RandomRange = 1000007
+    IntInt_Average = 1000008
+    IntInt_Min = 1000009
+    IntInt_Max = 1000010
+    FloatFloat_Add = 2000002
+    FloatFloat_Subtract = 2000003
+    FloatFloat_Mult = 2000004
+    FloatFloat_Divide = 2000005
+    FloatFloat_Power = 2000006
+    FloatFloat_RandomRange = 2000007
+    FloatFloat_Average = 2000008
+    FloatFloat_Min = 2000009
+    FloatFloat_Max = 2000010
+    VectorVector_Dot = 2000011
+    VectorVector_Distance = 2000012
+    VectorVector_Add = 3000002
+    VectorVector_Subtract = 3000003
+    VectorVector_Divide = 3000004
+    VectorVector_Multiply = 3000005
+    VectorVector_Project = 3000006
+    VectorVector_Cross = 3000007
+    VectorVector_NormalizeDifference = 3000008
+    VectorVector_Rotate = 3000009
+
 
 EBehaviorVariableLinkType = ["Unknown", "Context", "Input", "Output", "MAX"]
 BLANK_NAME = '" "'
@@ -259,23 +313,6 @@ def get_behaviour_name(behaviour: UObject, idx: int, sidx: int) -> str:
     return name
 
 
-def get_variable_value_info(
-    behavior_sequence: BehaviorProviderDefinition.BehaviorSequenceData,
-    variable_data: BehaviorProviderDefinition.BehaviorVariableData,
-) -> str:
-    data = bpd_vars.bpd_vars_native.get_behavior_variable_data(variable_data)
-    if data is None:
-        ""
-    match variable_data.Type:
-        case EnumBehaviorVariableType.BVAR_Attribute:
-            data = cast("bpd_vars.bpd_vars_native.BVAttributeData", data)
-            ail = cast(
-                "BehaviorProviderDefinition.SubarrayData", data.ContextVariable
-            ).ArrayIndexAndLength
-            return f"ContextVariable: , Value: {data.Value}"
-    return f" {data}"
-
-
 def get_variable_data(
     behavior_sequence: BehaviorProviderDefinition.BehaviorSequenceData, linked_variables: int
 ) -> str:
@@ -303,8 +340,7 @@ def get_variable_data(
             d_name = d.Name if d.Name != "None" else ""
             data += str(
                 f"[{behavior_sequence.ConsolidatedLinkedVariables[v]}]{d_name}"
-                f"({EBehaviorVariableType[d.Type]}"
-                f"{get_variable_value_info(behavior_sequence, d)}) "
+                f"({EBehaviorVariableType[d.Type]}) "
             )
         data += f"via [{var}]{link_data.PropertyName}"
 
@@ -333,6 +369,8 @@ def generate_graph(
         f"""    labelloc="t";
 		label="{behavior_provider_definition._path_name()}";\n"""
     )
+    event_subgraph = graphviz.Digraph()
+    event_subgraph.attr(rank="min")
     for behavior_sequence_idx, behavior_sequence in enumerate(
         behavior_provider_definition.BehaviorSequences
     ):
@@ -348,7 +386,7 @@ def generate_graph(
                 unrealsdk.logging.error(f"Error for event:\n{event_data}")
                 unrealsdk.logging.error(e)
                 return None
-            dot.node(
+            event_subgraph.node(
                 get_event_name(
                     behavior_sequence, event_data, behavior_sequence_idx, event_data_idx
                 ),
@@ -358,6 +396,7 @@ def generate_graph(
                 fillcolor="chartreuse2",
                 group="event",
             )
+
         for behavior_data_idx, behavior_data in enumerate(behavior_sequence.BehaviorData2):
             if behavior_data.Behavior is None:
                 continue
@@ -451,13 +490,14 @@ def generate_graph(
                         f"{additional_behaviour_link_data(behavior_data.Behavior, link_id)}"
                     ),
                 )
+    dot.subgraph(event_subgraph)
     return dot
 
 
 @command(splitter=obj_name_splitter, description="Graph a bpd.")
 def graph_bpd(args: argparse.Namespace) -> None:
     dot = generate_graph(unrealsdk.find_object("BehaviorProviderDefinition", args.bpd))
-    if dot:
+    if dot is not None:
         dot.render(
             filename="bpd", format="pdf", directory=SETTINGS_DIR / "bpds", view=not args.no_view
         )
@@ -466,4 +506,8 @@ def graph_bpd(args: argparse.Namespace) -> None:
 graph_bpd.add_argument("bpd")
 graph_bpd.add_argument("--no_view", action="store_true")
 
-build_mod(commands=[graph_bpd, dump_bpd.dump_bpd])
+commands = [graph_bpd]
+if dump_bpd is not None:
+    commands.append(dump_bpd.dump_bpd)
+
+build_mod(commands=commands)
