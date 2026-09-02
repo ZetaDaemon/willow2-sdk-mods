@@ -6,7 +6,7 @@ from mods_base import command, get_pc
 from unrealsdk.unreal import UObject
 
 
-def drop_loot_inner(obj: UObject, quantity: int) -> None:
+def drop_loot_inner(obj: UObject, quantity: int, level: int) -> None:
     item_pool = unrealsdk.find_class("ItemPool").ClassDefaultObject
     willow_pc = get_pc()
     new_items = []
@@ -14,7 +14,7 @@ def drop_loot_inner(obj: UObject, quantity: int) -> None:
         for _ in range(quantity):
             _, items = item_pool.SpawnBalancedInventoryFromPool(
                 obj,
-                willow_pc.Pawn.GetGameStage(),
+                level,
                 0,
                 willow_pc,
                 [],
@@ -24,7 +24,7 @@ def drop_loot_inner(obj: UObject, quantity: int) -> None:
         _, items = item_pool.SpawnBalancedInventoryFromInventoryBalanceDefinition(
             obj,
             quantity,
-            willow_pc.Pawn.GetGameStage(),
+            level,
             0,
             willow_pc,
             [],
@@ -52,8 +52,18 @@ def drop_loot(args: argparse.Namespace) -> None:
     except ValueError:
         unrealsdk.logging.error("quantity must be an int.")
         return
+    
+    level = 0
+    try:
+        level = int(args.level)
+        if level < 0:
+            level = get_pc().Pawn.GetGameStage()
+    except ValueError:
+        unrealsdk.logging.error("level must be an int.")
+        return
+
     obj = parse_object(args.obj)
-    drop_loot_inner(obj, quantity)
+    drop_loot_inner(obj, quantity, level)
 
 
 drop_loot.add_argument("obj", help="The balance or pool to drop.")
@@ -62,4 +72,10 @@ drop_loot.add_argument(
     nargs="?",
     default="1",
     help="The number of times to drop",
+)
+drop_loot.add_argument(
+    "level",
+    nargs="?",
+    default="-1",
+    help="The level of the dropped item, values below 0 use the player's level",
 )
