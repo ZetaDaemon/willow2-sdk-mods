@@ -1,37 +1,44 @@
 import argparse
+from collections.abc import Iterable
 
 import unrealsdk
 from command_extensions.builtins import obj_name_splitter, parse_object
 from mods_base import build_mod, command, get_pc
-from unrealsdk.unreal import UFunction, UObject, WrappedStruct
+from unrealsdk.unreal import UFunction, UObject
 
 from modder_commands.drop_loot import drop_loot
 
 
-def get_context_from_path(context: UObject, path: str) -> UObject:
+def get_context_from_path(context: UObject, path: str) -> UObject | None:
     out_context = context
     for name in path.split(","):
-        try:
-            new_context = getattr(out_context, name)
-        except AttributeError:
-            unrealsdk.logging.error(
-                f"{name} either does not exist on {out_context}.",
-            )
-            return None
-        if new_context is None:
-            unrealsdk.logging.error(
-                f"{name} on {out_context} is None.",
-            )
-            return None
-        if isinstance(new_context, UFunction):
-            new_context = new_context()
-            if not isinstance(new_context, UObject):
-                unrealsdk.logging.error(f"{name} on {out_context} does not return a UObject.")
+        if isinstance(out_context, list):
+            try:
+                new_context = out_context[int(name)]
+            except ValueError:
+                unrealsdk.logging.error(f"{name} is not a valid index.")
                 return None
-        elif not isinstance(new_context, UObject):
-            unrealsdk.logging.error(f"{name} on {out_context} is not a UObject.")
-            return None
+        else:
+            try:
+                new_context = getattr(out_context, name)
+            except AttributeError:
+                unrealsdk.logging.error(f"{name} either does not exist on {out_context}.")
+                return None
+            if new_context is None:
+                unrealsdk.logging.error(f"{name} on {out_context} is None.")
+                return None
+            if isinstance(new_context, UFunction):
+                new_context = new_context()
+                if not isinstance(new_context, UObject):
+                    unrealsdk.logging.error(f"{name} on {out_context} does not return a UObject.")
+                    return None
+            if isinstance(new_context, Iterable):
+                pass
+            elif not isinstance(new_context, UObject):
+                unrealsdk.logging.error(f"{name} on {out_context} is not a UObject.")
+                return None
         out_context = new_context
+    return out_context
 
 
 @command(
@@ -80,8 +87,7 @@ eval_attr.add_argument(
 
 
 @command(
-    splitter=obj_name_splitter,
-    description="Get the value of an AttributeInitializationDefinition",
+    splitter=obj_name_splitter, description="Get the value of an AttributeInitializationDefinition"
 )
 def eval_initdef(args: argparse.Namespace) -> None:
     initdef = parse_object(args.initdef)
@@ -117,13 +123,12 @@ def eval_initdef(args: argparse.Namespace) -> None:
                 BaseValueScaleConstant=1,
             ),
             context,
-        ),
+        )
     )
 
 
 eval_initdef.add_argument(
-    "initdef",
-    help="The AttributeInitializationDefinition to get the value of.",
+    "initdef", help="The AttributeInitializationDefinition to get the value of."
 )
 eval_initdef.add_argument(
     "context",
