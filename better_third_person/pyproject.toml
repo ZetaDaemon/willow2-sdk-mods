@@ -1,0 +1,23 @@
+[project]
+name = "better_third_person"
+version = "1.0"
+authors = [{ name = "ZetaDaemon" }]
+description = """
+Improves the functionality of third person with camera customisation.
+Third person aim has a couple options, zoom in while remaining third person, \
+scope in like normal or default zoom in but double click to zoom.
+Also fixes third person weapon aim, this may cause performance issues so it can be disabled.
+"""
+
+#[project.urls]
+#Changelog = "https://github.com/ZetaDaemon/willow2-sdk-mods/blob/main/better_third_person/readme.md#Changelog"
+
+[tool.sdkmod]
+name = "Better Third Person"
+version = "1.0"
+license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/better_third_person.sdkmod"
+
+
+[tool.sdkmod_release_script]
+files = ["*.py"]
