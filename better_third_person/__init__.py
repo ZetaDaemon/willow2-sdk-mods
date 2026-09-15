@@ -71,7 +71,14 @@ default_third_person = BoolOption(
     "Default Third Person", False, description="Should third person be used by default."
 )
 
-zoom_fov_modifier = ScaledSlider("Zoom FOV Modifier", 0, -100, 0, scale=0.01)
+zoom_fov_modifier = ScaledSlider(
+    "Zoom FOV Modifier",
+    0,
+    -100,
+    0,
+    scale=0.01,
+    description="Reduce the aim fov modifier while in zoom mode.",
+)
 
 use_aim_fix = BoolOption("Use Aim Fix", True, description="Fix third person weapon aim.")
 
@@ -161,6 +168,7 @@ def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
     if (pawn := pc.pawn) is not None and pawn.OffHandWeapon is not None:
         pc.StartFire(1)
         return Block
+    hud = pc.GetHUDMovie()
     if (
         pc.WorldInfo.TimeSeconds - pc.LastZoomTime
     ) < pc.PlayerInput.DoubleClickTime and aim_mode.value == AimZoomMode.DOUBLE_CLICK:
@@ -168,6 +176,7 @@ def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
             should_resume_third_person = True
             stop_third_person(pc)
             remove_fov_modifier(pawn.Weapon)
+            hud.CrosshairWidget.bScopeCrosshair = False
         else:
             should_stop_third_person = True
         pc.StartFire(1)
@@ -209,6 +218,7 @@ def set_zoom_state(
     if (owner := weapon.Owner) is None or (controller := owner.Controller) != get_pc():
         return
 
+    hud = controller.GetHUDMovie()
     match args.NewZoomState:
         case EZoomState.ZST_Zoomed:
             if should_stop_third_person:
@@ -217,10 +227,16 @@ def set_zoom_state(
                 weapon.ZoomedFOV = weapon.ZoomedEndFOV
                 should_stop_third_person = False
                 should_resume_third_person = True
+            elif aim_mode.value != AimZoomMode.SCOPE and controller.bBehindView:
+                hud.CrosshairWidget.bScopeCrosshair = True
 
         case EZoomState.ZST_ZoomingIn:
             if controller.bBehindView:
                 apply_fov_modifier(weapon)
+
+        case EZoomState.ZST_ZoomingOut:
+            if aim_mode.value != AimZoomMode.SCOPE:
+                hud.CrosshairWidget.bScopeCrosshair = False
 
         case EZoomState.ZST_NotZoomed:
             remove_fov_modifier(weapon)
@@ -236,16 +252,14 @@ def get_adjusted_aim(
     if (weapon := args.W) is None:
         return None
     pawn = pc.MyWillowPawn
-    base_aim_loc = pawn.Cached3rdPersonCamLoc
-    base_aim_rot = pawn.Cached3rdPersonCamRot
-    base_aim_vec = uemath.rotator_to_vector(base_aim_rot)
-    base_aim_end = uemath.vector_add(
-        base_aim_loc, uemath.multiply_vector_float(base_aim_vec, weapon.WeaponRange)
-    )
-    impact, __ = weapon.CalcWeaponFire(base_aim_loc, base_aim_end)
-    return Block, uemath.vector_to_rotator(
-        uemath.vector_sub(impact.HitLocation, args.StartFireLoc)  # ty: ignore[invalid-argument-type]
-    )
+    base_aim_loc = uemath.Vector(pawn.Cached3rdPersonCamLoc)
+    base_aim_rot = uemath.Rotator(pawn.Cached3rdPersonCamRot)
+    base_aim_vec = uemath.Vector(base_aim_rot)
+    base_aim_end = base_aim_loc + (base_aim_vec * weapon.WeaponRange)
+    impact, __ = weapon.CalcWeaponFire(base_aim_loc.wrapped_struct, base_aim_end.wrapped_struct)
+    return Block, uemath.Rotator(
+        uemath.Vector(impact.HitLocation) - uemath.Vector(args.StartFireLoc)
+    ).wrapped_struct
 
 
 build_mod(
