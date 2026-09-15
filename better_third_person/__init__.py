@@ -57,7 +57,7 @@ class ScaledSlider(SliderOption):
         self.value = value
 
 
-camera_scale = ScaledSlider("Camera Scale", 30, -100, 100, scale=0.1)
+camera_scale = ScaledSlider("Camera Distance", 30, 0, 100, scale=0.1)
 horizontal_offset = ScaledSlider("Horizontal Offset", 15, -100, 100, scale=0.1)
 vertical_offset = ScaledSlider("Vertical Offset", 10, -100, 100, scale=0.1)
 
@@ -163,30 +163,32 @@ def pc_possess(pc: WillowPlayerController, *_: Any) -> None:
 @hook("WillowGame.WillowPlayerController:StartAltFire")
 def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
     global should_resume_third_person, should_stop_third_person
-    if not pc.bBehindView:
-        return None
     if (pawn := pc.pawn) is not None and pawn.OffHandWeapon is not None:
         pc.StartFire(1)
         return Block
     hud = pc.GetHUDMovie()
-    if (
-        pc.WorldInfo.TimeSeconds - pc.LastZoomTime
-    ) < pc.PlayerInput.DoubleClickTime and aim_mode.value == AimZoomMode.DOUBLE_CLICK:
-        if pawn.Weapon.ZoomState == EZoomState.ZST_Zoomed:
-            should_resume_third_person = True
-            stop_third_person(pc)
-            remove_fov_modifier(pawn.Weapon)
-            hud.CrosshairWidget.bScopeCrosshair = False
-        else:
-            should_stop_third_person = True
-        pc.StartFire(1)
-        return Block
-    if pc.bZoomToggle and pc.isZoomed():
+    if (pc.WorldInfo.TimeSeconds - pc.LastZoomTime) < pc.PlayerInput.DoubleClickTime:
+        if pc.bBehindView and aim_mode.value == AimZoomMode.DOUBLE_CLICK:
+            if pawn.Weapon.ZoomState == EZoomState.ZST_Zoomed:
+                should_resume_third_person = True
+                stop_third_person(pc)
+                remove_fov_modifier(pawn.Weapon)
+                hud.CrosshairWidget.bScopeCrosshair = False
+                pawn.Weapon.DisplayScope(True)
+            else:
+                should_stop_third_person = True
+            if not pc.bZoomToggle:
+                pc.StartFire(1)
+            return Block
+    elif pc.bZoomToggle and pc.isZoomed():
+        if should_resume_third_person:
+            start_third_person(pc)
+            should_resume_third_person = False
         pc.StopFire(1)
         return Block
     pc.StartFire(1)
     pc.LastZoomTime = pc.WorldInfo.TimeSeconds
-    if aim_mode.value == AimZoomMode.SCOPE and pc.bBehindView:
+    if pc.bBehindView and aim_mode.value == AimZoomMode.SCOPE:
         should_stop_third_person = True
     return Block
 
@@ -194,7 +196,7 @@ def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
 @hook("WillowGame.WillowPlayerController:StopAltFire")
 def pc_stop_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
     global should_resume_third_person
-    if should_resume_third_person:
+    if should_resume_third_person and not pc.bZoomToggle:
         start_third_person(pc)
         should_resume_third_person = False
 
@@ -227,7 +229,7 @@ def set_zoom_state(
                 weapon.ZoomedFOV = weapon.ZoomedEndFOV
                 should_stop_third_person = False
                 should_resume_third_person = True
-            elif aim_mode.value != AimZoomMode.SCOPE and controller.bBehindView:
+            elif controller.bBehindView:
                 hud.CrosshairWidget.bScopeCrosshair = True
 
         case EZoomState.ZST_ZoomingIn:
@@ -235,8 +237,7 @@ def set_zoom_state(
                 apply_fov_modifier(weapon)
 
         case EZoomState.ZST_ZoomingOut:
-            if aim_mode.value != AimZoomMode.SCOPE:
-                hud.CrosshairWidget.bScopeCrosshair = False
+            hud.CrosshairWidget.bScopeCrosshair = False
 
         case EZoomState.ZST_NotZoomed:
             remove_fov_modifier(weapon)
