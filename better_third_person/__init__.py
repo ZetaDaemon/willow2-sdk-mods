@@ -15,7 +15,7 @@ from better_third_person import uemath
 if TYPE_CHECKING:
     from bl2.Core import Object
     from bl2.Engine import AttributeDefinition
-    from bl2.WillowGame import WillowPlayerController, WillowWeapon
+    from bl2.WillowGame import WillowPawn, WillowPlayerController, WillowPlayerPawn, WillowWeapon
 
     EZoomState = WillowWeapon.EZoomState
     Vector = Object.Vector
@@ -81,12 +81,19 @@ zoom_fov_modifier = ScaledSlider(
 )
 
 use_aim_fix = BoolOption("Use Aim Fix", True, description="Fix third person weapon aim.")
+third_toggle_toggles_default = BoolOption(
+    "Keybind Changes Default",
+    False,
+    description="Should the third person keybind also change 'Default Third Person'.",
+)
 
-should_resume_third_person = False
+is_third_person_desired = False
 should_stop_third_person = False
 
 
 def start_third_person(pc: WillowPlayerController) -> None:
+    global is_third_person_desired
+    is_third_person_desired = True
     view_target = pc.Pawn
     view_target.CameraScale = camera_scale.scaled_value
     view_target.CameraScaleRight = horizontal_offset.scaled_value
@@ -95,6 +102,8 @@ def start_third_person(pc: WillowPlayerController) -> None:
 
 
 def stop_third_person(pc: WillowPlayerController) -> None:
+    global is_third_person_desired
+    is_third_person_desired = False
     pc.SetBehindView(False)
 
 
@@ -104,6 +113,13 @@ def toggle_third_person() -> None:
         stop_third_person(pc)
     else:
         start_third_person(pc)
+
+
+def fix_third_person_state(pc: WillowPlayerController) -> None:
+    if is_third_person_desired:
+        start_third_person(pc)
+    else:
+        stop_third_person(pc)
 
 
 modifier_pointer: WeakPointer = WeakPointer()
@@ -152,6 +168,8 @@ def remove_fov_modifier(weapon: WillowWeapon) -> None:
 @keybind("Toggle Third Person")
 def toggle_third_person_callback() -> None:
     toggle_third_person()
+    if third_toggle_toggles_default:
+        default_third_person.value = is_third_person_desired
 
 
 @hook("WillowGame.WillowPlayerController:Possess", Type.POST)
@@ -162,43 +180,42 @@ def pc_possess(pc: WillowPlayerController, *_: Any) -> None:
 
 @hook("WillowGame.WillowPlayerController:StartAltFire")
 def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
-    global should_resume_third_person, should_stop_third_person
+    # This function is a mess, I hate it.
+    global should_stop_third_person
     if (pawn := pc.pawn) is not None and pawn.OffHandWeapon is not None:
         pc.StartFire(1)
         return Block
-    hud = pc.GetHUDMovie()
+
     if (pc.WorldInfo.TimeSeconds - pc.LastZoomTime) < pc.PlayerInput.DoubleClickTime:
         if pc.bBehindView and aim_mode.value == AimZoomMode.DOUBLE_CLICK:
             if pawn.Weapon.ZoomState == EZoomState.ZST_Zoomed:
-                should_resume_third_person = True
                 stop_third_person(pc)
                 remove_fov_modifier(pawn.Weapon)
-                hud.CrosshairWidget.bScopeCrosshair = False
+                pc.GetHUDMovie().CrosshairWidget.bScopeCrosshair = False
                 pawn.Weapon.DisplayScope(True)
             else:
                 should_stop_third_person = True
             if not pc.bZoomToggle:
                 pc.StartFire(1)
             return Block
+
     elif pc.bZoomToggle and pc.isZoomed():
-        if should_resume_third_person:
+        if is_third_person_desired:
             start_third_person(pc)
-            should_resume_third_person = False
         pc.StopFire(1)
         return Block
+
     pc.StartFire(1)
     pc.LastZoomTime = pc.WorldInfo.TimeSeconds
-    if pc.bBehindView and aim_mode.value == AimZoomMode.SCOPE:
-        should_stop_third_person = True
     return Block
 
 
 @hook("WillowGame.WillowPlayerController:StopAltFire")
 def pc_stop_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
-    global should_resume_third_person
-    if should_resume_third_person and not pc.bZoomToggle:
+    if pc.bZoomToggle:
+        return
+    if is_third_person_desired:
         start_third_person(pc)
-        should_resume_third_person = False
 
 
 @hook("WillowGame.WillowWeapon:DisplayScope")  # ty: ignore[invalid-argument-type]
@@ -216,20 +233,22 @@ def is_scoped(weapon: WillowWeapon, args: WillowWeapon.DisplayScope.args, *_: An
 def set_zoom_state(
     weapon: WillowWeapon, args: WillowWeapon.SetZoomState.args, *_: Any
 ) -> PreHookRet:
-    global should_stop_third_person, should_resume_third_person
+    # For a smoother transition out of third person, we only want to exit it once fully zoomed in,
+    # rather than when we start to ADS.
+    global should_stop_third_person
     if (owner := weapon.Owner) is None or (controller := owner.Controller) != get_pc():
         return
 
     hud = controller.GetHUDMovie()
     match args.NewZoomState:
         case EZoomState.ZST_Zoomed:
-            if should_stop_third_person:
-                stop_third_person(owner.Controller)
-                remove_fov_modifier(weapon)
-                weapon.ZoomedFOV = weapon.ZoomedEndFOV
-                should_stop_third_person = False
-                should_resume_third_person = True
-            elif controller.bBehindView:
+            if controller.bBehindView:
+                if aim_mode.value == AimZoomMode.SCOPE or should_stop_third_person:
+                    stop_third_person(owner.Controller)
+                    remove_fov_modifier(weapon)
+                    weapon.ZoomedFOV = weapon.ZoomedEndFOV
+                    should_stop_third_person = False
+            else:
                 hud.CrosshairWidget.bScopeCrosshair = True
 
         case EZoomState.ZST_ZoomingIn:
@@ -248,19 +267,33 @@ def set_zoom_state(
 def get_adjusted_aim(
     pc: WillowPlayerController, args: WillowPlayerController.Get3rdPersonAimRotation.args, *_: Any
 ) -> PreHookRet:
+    # Honestly I'm not even sure why this is so broken in vanilla, something about the way
+    # Weapon:CalcWeaponFire calling Actor:Trace works rather than the way this function does it.
     if not use_aim_fix.value:
         return None
     if (weapon := args.W) is None:
         return None
-    pawn = pc.MyWillowPawn
+    pawn = cast("WillowPlayerPawn", pc.MyWillowPawn)
     base_aim_loc = uemath.Vector(pawn.Cached3rdPersonCamLoc)
     base_aim_rot = uemath.Rotator(pawn.Cached3rdPersonCamRot)
     base_aim_vec = uemath.Vector(base_aim_rot)
     base_aim_end = base_aim_loc + (base_aim_vec * weapon.WeaponRange)
-    impact, __ = weapon.CalcWeaponFire(base_aim_loc.wrapped_struct, base_aim_end.wrapped_struct)
+    impact, __ = weapon.CalcWeaponFire(
+        base_aim_loc.wrapped_struct, base_aim_end.wrapped_struct, bTestTrace=True
+    )
     return Block, uemath.Rotator(
         uemath.Vector(impact.HitLocation) - uemath.Vector(args.StartFireLoc)
     ).wrapped_struct
+
+
+@hook("WillowGame.WillowPawn:GoFromInjuredToHealthy", Type.POST)
+def revived(pawn: WillowPawn, *_: Any) -> None:
+    fix_third_person_state(pawn.Controller)  # ty: ignore[invalid-argument-type]
+
+
+@hook("WillowGame.WillowPlayerPawn:AwaitingRespawn.EndState", Type.POST)
+def await_respawn_end(pawn: WillowPlayerPawn, *_: Any) -> None:
+    fix_third_person_state(pawn.Controller)  # ty: ignore[invalid-argument-type]
 
 
 build_mod(
