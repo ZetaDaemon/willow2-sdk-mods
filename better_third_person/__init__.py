@@ -302,6 +302,7 @@ build_mod(
         aim_mode,
         zoom_fov_modifier,
         use_aim_fix,
+        third_toggle_toggles_default,
         third_person_camera_settings,
     ]
 )
