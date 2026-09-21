@@ -189,7 +189,7 @@ def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
     if (pc.WorldInfo.TimeSeconds - pc.LastZoomTime) < pc.PlayerInput.DoubleClickTime:
         if pc.bBehindView and aim_mode.value == AimZoomMode.DOUBLE_CLICK:
             if pawn.Weapon.ZoomState == EZoomState.ZST_Zoomed:
-                stop_third_person(pc)
+                pc.SetBehindView(False)
                 remove_fov_modifier(pawn.Weapon)
                 pc.GetHUDMovie().CrosshairWidget.bScopeCrosshair = False
                 pawn.Weapon.DisplayScope(True)
@@ -244,7 +244,7 @@ def set_zoom_state(
         case EZoomState.ZST_Zoomed:
             if controller.bBehindView:
                 if aim_mode.value == AimZoomMode.SCOPE or should_stop_third_person:
-                    stop_third_person(owner.Controller)
+                    pc.SetBehindView(False)
                     remove_fov_modifier(weapon)
                     weapon.ZoomedFOV = weapon.ZoomedEndFOV
                     should_stop_third_person = False
@@ -260,6 +260,8 @@ def set_zoom_state(
 
         case EZoomState.ZST_NotZoomed:
             remove_fov_modifier(weapon)
+            if is_third_person_desired:
+                start_third_person(controller)
     return
 
 
