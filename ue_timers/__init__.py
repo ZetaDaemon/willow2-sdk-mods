@@ -27,7 +27,7 @@ class UnrealTimer:
     """
 
     on_finish: Callable[[], None] = field(init=True)
-    _timer_actor: WeakPointer | None = field(init=False, default_factory=WeakPointer)
+    _timer_actor: WeakPointer = field(init=False, default_factory=WeakPointer)
     duration: float = field(init=False, default=0)
     loop: bool = field(init=False, default=False)
 
@@ -61,7 +61,8 @@ class UnrealTimer:
     ) -> None:
         if self.duration == 0 and self.loop is False:
             return
-        self.start(self.duration, self.loop)
+        if not self.is_running():
+            self.start(self.duration, self.loop)
 
     def _get_timer_actor(self) -> UObject:
         actor: UObject | None = self._timer_actor()
@@ -73,7 +74,7 @@ class UnrealTimer:
 
     def _get_timer_data(self) -> WrappedStruct | None:
         timer_actor = self._timer_actor()
-        if self._timer_actor() is None:
+        if timer_actor is None:
             return None
         for timer in timer_actor.Timers:
             if timer.FuncName == "Timer":
@@ -141,7 +142,6 @@ class UnrealTimer:
         if timer_data is None:
             msg = "Cannot resume a timer that is not running."
             raise RuntimeError(msg)
-            return
         timer_data.bPaused = False
 
     def update(self, duration: float, loop: bool) -> None:
