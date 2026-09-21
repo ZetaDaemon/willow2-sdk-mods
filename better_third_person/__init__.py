@@ -95,6 +95,8 @@ def start_third_person(pc: WillowPlayerController) -> None:
     global is_third_person_desired
     is_third_person_desired = True
     view_target = pc.Pawn
+    if view_target.DrivenVehicle is not None:
+        return
     view_target.CameraScale = camera_scale.scaled_value
     view_target.CameraScaleRight = horizontal_offset.scaled_value
     view_target.CameraScaleUp = vertical_offset.scaled_value
@@ -276,6 +278,8 @@ def get_adjusted_aim(
     if (weapon := args.W) is None:
         return None
     pawn = cast("WillowPlayerPawn", pc.MyWillowPawn)
+    if pawn.DrivenVehicle is not None:
+        return None
     base_aim_loc = uemath.Vector(pawn.Cached3rdPersonCamLoc)
     base_aim_rot = uemath.Rotator(pawn.Cached3rdPersonCamRot)
     base_aim_vec = uemath.Vector(base_aim_rot)
