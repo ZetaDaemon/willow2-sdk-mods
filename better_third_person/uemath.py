@@ -127,7 +127,7 @@ class Rotator:
                 self._wrapped_struct = Vector.to_rotator(struct.wrapped_struct)
             elif struct._type == ROTATOR_SCRIPT_STRUCT:
                 self._wrapped_struct = cast("Object.Rotator", struct)
-            elif struct._type == ROTATOR_SCRIPT_STRUCT:
+            elif struct._type == VECTOR_SCRIPT_STRUCT:
                 self._wrapped_struct = Vector.to_rotator(cast("Object.Vector", struct))
             return
         self._wrapped_struct = cast(

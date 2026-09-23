@@ -77,7 +77,15 @@ zoom_fov_modifier = ScaledSlider(
     -100,
     0,
     scale=0.01,
-    description="Reduce the aim fov modifier while in zoom mode.",
+    description="Reduce the aim fov modifier while in zoom mode. Value is a %",
+)
+interaction_distance_modifier = ScaledSlider(
+    "Interaction Distance Modifier",
+    200,
+    100,
+    1000,
+    scale=0.01,
+    description="Increase third person interaction distance. Value is a %",
 )
 
 use_aim_fix = BoolOption("Use Aim Fix", True, description="Fix third person weapon aim.")
@@ -90,20 +98,33 @@ third_toggle_toggles_default = BoolOption(
 is_third_person_desired = False
 should_stop_third_person = False
 
+DEFAULT_INTERACT_DISTANCE = 512
+
+
+@hook("WillowGame.WillowPlayerController:SetBehindView")  # ty: ignore[invalid-argument-type]
+def set_behind_view(
+    pc: WillowPlayerController, args: WillowPlayerController.SetBehindView.args, *_: Any
+) -> PreHookRet:
+    if args.bNewBehindView:
+        view_target = pc.Pawn
+        view_target.CameraScale = camera_scale.scaled_value
+        view_target.CameraScaleRight = horizontal_offset.scaled_value
+        view_target.CameraScaleUp = vertical_offset.scaled_value
+        pc.InteractDistance = DEFAULT_INTERACT_DISTANCE * interaction_distance_modifier.scaled_value
+        return
+    pc.InteractDistance = DEFAULT_INTERACT_DISTANCE
+
 
 def start_third_person(pc: WillowPlayerController) -> None:
     global is_third_person_desired
     is_third_person_desired = True
-    view_target = pc.Pawn
-    view_target.CameraScale = camera_scale.scaled_value
-    view_target.CameraScaleRight = horizontal_offset.scaled_value
-    view_target.CameraScaleUp = vertical_offset.scaled_value
     pc.SetBehindView(True)
 
 
 def stop_third_person(pc: WillowPlayerController) -> None:
     global is_third_person_desired
     is_third_person_desired = False
+    pc.InteractDistance = DEFAULT_INTERACT_DISTANCE
     pc.SetBehindView(False)
 
 
@@ -189,7 +210,7 @@ def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
     if (pc.WorldInfo.TimeSeconds - pc.LastZoomTime) < pc.PlayerInput.DoubleClickTime:
         if pc.bBehindView and aim_mode.value == AimZoomMode.DOUBLE_CLICK:
             if pawn.Weapon.ZoomState == EZoomState.ZST_Zoomed:
-                stop_third_person(pc)
+                pc.SetBehindView(False)
                 remove_fov_modifier(pawn.Weapon)
                 pc.GetHUDMovie().CrosshairWidget.bScopeCrosshair = False
                 pawn.Weapon.DisplayScope(True)
@@ -201,7 +222,7 @@ def pc_start_alt_fire(pc: WillowPlayerController, *_: Any) -> PreHookRet:
 
     elif pc.bZoomToggle and pc.isZoomed():
         if is_third_person_desired:
-            start_third_person(pc)
+            pc.SetBehindView(True)
         pc.StopFire(1)
         return Block
 
@@ -301,6 +322,7 @@ build_mod(
         default_third_person,
         aim_mode,
         zoom_fov_modifier,
+        interaction_distance_modifier,
         use_aim_fix,
         third_toggle_toggles_default,
         third_person_camera_settings,

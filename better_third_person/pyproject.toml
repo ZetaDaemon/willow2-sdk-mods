@@ -1,6 +1,6 @@
 [project]
 name = "better_third_person"
-version = "1.1"
+version = "3"
 authors = [{ name = "ZetaDaemon" }]
 description = """
 Improves the functionality of third person with camera customisation.
@@ -14,7 +14,7 @@ Changelog = "https://github.com/ZetaDaemon/willow2-sdk-mods/blob/main/better_thi
 
 [tool.sdkmod]
 name = "Better Third Person"
-version = "1.1"
+version = "3"
 license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
 download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/better_third_person.sdkmod"
 
