@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 # Nothing from CE is directly used in python, but clone commands are used.
 import command_extensions  # noqa: F401
-import uemath
 import unrealsdk
 from mods_base import (
-    ENGINE,
     BoolOption,
     NestedOption,
     SliderOption,
@@ -24,6 +21,7 @@ from networking import add_network_functions, host
 from unrealsdk.hooks import Block, Type
 from unrealsdk.unreal import WeakPointer
 
+from movement_tech import uemath
 from movement_tech.ucaching import ObjReferenceByName
 
 if TYPE_CHECKING:
@@ -202,7 +200,7 @@ def can_jump(pawn: WillowPlayerPawn, *_: Any) -> tuple[type[Block], bool] | None
     if not DOUBLEJUMP_ENABLED.value:
         return None
     physics = pawn.Physics
-    info = lookup_player_info(pawn.Controller)
+    info = lookup_player_info(pawn.Controller)  # ty: ignore[invalid-argument-type]
 
     if not info.can_double_jump:
         return None
@@ -225,7 +223,7 @@ def can_jump(pawn: WillowPlayerPawn, *_: Any) -> tuple[type[Block], bool] | None
 
 @hook("WillowGame.WillowPlayerPawn:PlayLanded")
 def play_landed(pawn: WillowPlayerPawn, *_: Any) -> None:
-    info = lookup_player_info(pawn.Controller)
+    info = lookup_player_info(pawn.Controller)  # ty: ignore[invalid-argument-type]
     info.can_double_jump = True
 
 
@@ -246,9 +244,9 @@ def duck_pressed(*_: Any) -> None:
     request_slam()
 
 
-@keybind("Grapple", event_filter=EInputEvent.IE_Pressed)
+@keybind("Grapple")
 def try_grapple() -> None:
-    pc: WillowPlayerController = get_pc()
+    pc: WillowPlayerController = get_pc()  # ty: ignore[invalid-assignment]
     info = lookup_player_info(pc)
     if not pc.CanPerformWeaponAction():
         return
@@ -262,7 +260,7 @@ def try_grapple() -> None:
     pc.bThrowingGrenade = True
 
 
-@hook("WillowGame.WillowPlayerController:Behavior_SpawnCurrentProjectile", Type.POST)
+@hook("WillowGame.WillowPlayerController:Behavior_SpawnCurrentProjectile", Type.POST)  # ty: ignore[invalid-argument-type]
 def spawn_projectile(
     pc: WillowPlayerController,
     args: WillowPlayerController.Behavior_SpawnCurrentProjectile.args,
@@ -279,27 +277,26 @@ def spawn_projectile(
     projectile = ret
     forward = uemath.Vector(pc.Rotation) * 50
     projectile.MaxSpeed = GRAPPLE_PROJECTILE_SPEED.scaled_value
-    projectile.SetVelocityAndAcceleration((forward).normalize().to_ue_vector())
+    projectile.SetVelocityAndAcceleration(forward.normalize().wrapped_struct)
     info.grapple_projectile = WeakPointer(projectile)
 
     fire_beam = FIRE_BEAM()
-    fire_beam.SourceOffset = unrealsdk.make_struct(
-        "Vector",
-        X=pawn.CylinderComponent.CollisionRadius * -0.8,
-        Y=pawn.CylinderComponent.CollisionRadius * -0.5,
-    )
+    fire_beam.SourceOffset = uemath.Vector(
+        x=pawn.CylinderComponent.CollisionRadius * -0.8,
+        y=pawn.CylinderComponent.CollisionRadius * -0.5,
+    ).wrapped_struct
     fire_beam.ApplyBehaviorToContext(
         pawn,
-        unrealsdk.make_struct("BehaviorKernelInfo"),
+        unrealsdk.make_struct("BehaviorKernelInfo"),  # ty: ignore[invalid-argument-type]
         pawn,
         pawn,
         projectile,
-        unrealsdk.make_struct("BehaviorParameters"),
+        unrealsdk.make_struct("BehaviorParameters"),  # ty: ignore[invalid-argument-type]
     )
     info.grapple_duration_remaining += GRAPPLE_DURATION.value
 
 
-@hook("WillowGame.WillowPlayerController:PlayerTick")
+@hook("WillowGame.WillowPlayerController:PlayerTick")  # ty: ignore[invalid-argument-type]
 def player_tick(
     pc: WillowPlayerController, args: WillowPlayerController.PlayerTick.args, *_: Any
 ) -> None:
@@ -321,7 +318,7 @@ def player_tick(
         projectile_manager = pc.Pawn.GetLightProjMgrFor(None)
         projectile_manager.DeleteBeamsFor(projectile)
         projectile.Detonate()
-        pawn.Velocity = (uemath.Vector(pawn.Velocity) / 5).to_ue_vector()
+        pawn.Velocity = (uemath.Vector(pawn.Velocity) / 5.0).wrapped_struct
         return
     if projectile.MaxSpeed > 0:
         return
@@ -334,7 +331,7 @@ def player_tick(
         pawn.Physics = EPhysics.PHYS_Falling
     pawn.Velocity = (
         uemath.Vector(pawn.Velocity) + direction * GRAPPLE_PULL_STRENGTH.scaled_value
-    ).to_ue_vector()
+    ).wrapped_struct
     return
 
 

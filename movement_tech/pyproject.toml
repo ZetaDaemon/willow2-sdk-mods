@@ -1,6 +1,6 @@
 [project]
 name = "movement_tech"
-version = "2.0"
+version = "2.2"
 authors = [{ name = "ZetaDaemon" }]
 description = """\
 Adds double jumps, slams and grappling. There are configurable settings for the slams and grappling.
