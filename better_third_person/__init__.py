@@ -265,7 +265,7 @@ def set_zoom_state(
         case EZoomState.ZST_Zoomed:
             if controller.bBehindView:
                 if aim_mode.value == AimZoomMode.SCOPE or should_stop_third_person:
-                    stop_third_person(owner.Controller)
+                    controller.SetBehindView(False)
                     remove_fov_modifier(weapon)
                     weapon.ZoomedFOV = weapon.ZoomedEndFOV
                     should_stop_third_person = False
