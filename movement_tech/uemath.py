@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+from copy import copy
 from math import sqrt
 from typing import TYPE_CHECKING, Self, cast, overload
 
@@ -47,7 +48,7 @@ class Vector:
             if isinstance(struct, Rotator):
                 self._wrapped_struct = Rotator.to_vector(struct.wrapped_struct)
             elif struct._type == VECTOR_SCRIPT_STRUCT:
-                self._wrapped_struct = cast("Object.Vector", struct)
+                self._wrapped_struct = cast("Object.Vector", copy(struct))
             elif struct._type == ROTATOR_SCRIPT_STRUCT:
                 self._wrapped_struct = Rotator.to_vector(cast("Object.Rotator", struct))
             return
@@ -96,9 +97,9 @@ class Vector:
 
     def normalize(self) -> Self:
         length = self.length()
-        self.x / length
-        self.y / length
-        self.z / length
+        self.x /= length
+        self.y /= length
+        self.z /= length
         return self
 
     def distance(self, other: Vector) -> float:
@@ -143,7 +144,7 @@ class Rotator:
             if isinstance(struct, Vector):
                 self._wrapped_struct = Vector.to_rotator(struct.wrapped_struct)
             elif struct._type == ROTATOR_SCRIPT_STRUCT:
-                self._wrapped_struct = cast("Object.Rotator", struct)
+                self._wrapped_struct = cast("Object.Rotator", copy(struct))
             elif struct._type == VECTOR_SCRIPT_STRUCT:
                 self._wrapped_struct = Vector.to_rotator(cast("Object.Vector", struct))
             return
