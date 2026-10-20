@@ -1,6 +1,6 @@
 [project]
 name = "modder_commands"
-version = "1.0"
+version = "1"
 authors = [{ name = "ZetaDaemon" }]
 description = """\
 Adds a command to drop items in game.
@@ -9,7 +9,9 @@ or ItemPoolDefinition, quantity must be an int, defaults to 1."""
 
 [tool.sdkmod]
 name = "Modder Commands"
-version = "1.0"
+version = "1"
+license = { name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/ZetaDaemon/willow2-sdk-mods/releases/download/nightly/modder_commands.sdkmod"
 
 [tool.sdkmod_release_script]
 files = ["*.md", "*.py"]
