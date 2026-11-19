@@ -2,7 +2,16 @@
 name = "inventory_saver"
 version = "1.0"
 authors = [{ name = "ZetaDaemon" }]
-description = "Saves items in your inventory, including custom parts."
+description = """
+Saves items in your inventory and bank, including custom parts.
+
+If an item is unable to be loaded in (usually do to the mod not being running), \
+the item is backed up and a warning is presented giving you the option to return to \
+the main menu, continue playing, or continue playing and purge backups.
+Both the warning and item protection can be disabled.
+
+Additionally allows for refreshing vendors on map load and deleting modded ground \
+items on map transition to prevent broken items."""
 
 [tool.sdkmod]
 name = "Inventory Saver"

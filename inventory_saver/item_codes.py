@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING, cast
 
 import unrealsdk
 from mods_base import Game
-from unrealsdk import logging
 from unrealsdk.unreal import UClass, WrappedStruct
+
+from inventory_saver.object_cache import find_object
 
 if TYPE_CHECKING:
     from bl2.Engine import WillowInventory
@@ -359,7 +360,7 @@ def _apply_overrides(
     for name, value in overrides.items():
         if isinstance(value, str):
             try:
-                part = unrealsdk.find_object("Object", value)
+                part = find_object(value)
             except ValueError:
                 missing[name] = value
                 continue
