@@ -18,4 +18,4 @@ name = "Inventory Saver"
 version = "1.0"
 
 [tool.sdkmod_release_script]
-files = ["*.py"]
+files = ["*.py", "zdict"]

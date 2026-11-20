@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import struct
 import zlib
+from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -36,7 +37,7 @@ GAME_PREFIX = {Game.BL2: "BL2MODDED", Game.TPS: "BLOZMODDED", Game.AoDK: "AODKMO
 )
 
 ZDICT = Path(__file__).parent / "zdict"
-ZDICT_BYTES = ZDICT.read_bytes()
+ZDICT_BYTES = files(__package__).joinpath("zdict").read_bytes()
 
 WEAPON_CODE_FIELDS = (
     "WeaponTypeDefinition",
