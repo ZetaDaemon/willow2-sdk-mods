@@ -9,6 +9,7 @@ from .item_codes import (
     WILLOW_ITEM_CLASS,
     WILLOW_WEAPON_CLASS,
     ItemCodeDecodeError,
+    apply_modded_item_code,
     decode_modded_item_code,
     get_item_code,
 )
@@ -144,7 +145,6 @@ def remove_backed_up_bank_codes(data: PlayerSaveData) -> None:
 
 def _restore_existing_entry[Record: ItemSaveData](
     current: DefinitionData,
-    inventory_class: UClass,
     active: dict[str, Record],
     pending: dict[str, Record],
     next_backup: dict[str, Record],
@@ -163,7 +163,7 @@ def _restore_existing_entry[Record: ItemSaveData](
         return None, None
 
     try:
-        definition, missing = decode_modded_item_code(record["code"], inventory_class)
+        definition, missing = apply_modded_item_code(record["code"], current)
     except ItemCodeDecodeError as exc:
         logging.error(f"Could not decode inventory item {item_id}: {exc}")
         del source[item_id]
@@ -175,7 +175,6 @@ def _restore_existing_entry[Record: ItemSaveData](
         del source[item_id]
         return None, None
 
-    definition.UniqueId = current.UniqueId
     del source[item_id]
     return definition, record
 
@@ -232,14 +231,9 @@ def restore_weapon_codes(save: PlayerSaveGame, save_data: PlayerSaveData) -> Non
 
     for entry in save.WeaponData:
         current = entry.WeaponDefinitionData
-        primary = current.WeaponTypeDefinition
-        weapon_class = (
-            primary.InventoryClass if primary is not None else None
-        ) or WILLOW_WEAPON_CLASS
 
         restored, record = _restore_existing_entry(
             current,
-            weapon_class,
             save_data["weapons"],
             save_data["backup"]["weapons"],
             new_backups["weapons"],
@@ -288,12 +282,9 @@ def restore_item_codes(save: PlayerSaveGame, save_data: PlayerSaveData) -> None:
 
     for entry in save.ItemData:
         current = entry.DefinitionData
-        primary = current.ItemDefinition
-        item_class = (primary.InventoryClass if primary is not None else None) or WILLOW_ITEM_CLASS
 
         restored, record = _restore_existing_entry(
             current,
-            item_class,
             save_data["items"],
             save_data["backup"]["items"],
             new_backups["items"],
@@ -341,7 +332,7 @@ def restore_storage_codes(storage: WillowInventoryStorage, save_data: PlayerSave
         live_ids.add(item_id)
 
         restored, record = _restore_existing_entry(
-            current, item.Class, active, pending, next_backup, protect=protect
+            current, active, pending, next_backup, protect=protect
         )
         if restored is None or record is None:
             continue

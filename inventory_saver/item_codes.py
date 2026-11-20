@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import struct
 import zlib
+from copy import copy
 from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -187,22 +188,13 @@ def pack_serial(serial: InventorySerialNumber) -> str:
     return base64.b64encode(buffer.rstrip(b"\xff")).decode("ascii")
 
 
-def _get_base_item_code(item: WillowWeapon | WillowItem) -> str:
-    serial, _ = item.PackSerialNumber(item.DefinitionData)  # pyright: ignore[reportArgumentType]
-    return pack_serial(serial)
-
-
-def _full_encode_item(item: WillowWeapon | WillowItem) -> str:
-    serial, _ = item.PackSerialNumber(item.DefinitionData)  # pyright: ignore[reportArgumentType]
-    *_, definition = item.UnpackSerialNumber(
-        serial,
-        unrealsdk.make_struct(item.DefinitionData._type.Name),  # pyright: ignore[reportArgumentType]
-    )
-
-    overrides = _definition_overrides(item.DefinitionData, definition)
-    fields = WEAPON_CODE_FIELDS if item.Class._inherits(WILLOW_WEAPON_CLASS) else ITEM_CODE_FIELDS
-    b64 = pack_serial(serial)
-    return encode_modded_code(b64, overrides, fields, ZDICT_BYTES)
+def _unpack_serial(buffer: bytearray, inventory_class: UClass) -> tuple[bool, DefinitionData]:
+    unpacker = inventory_class.ClassDefaultObject.UnpackSerialNumber
+    args = WrappedStruct(unpacker.func)
+    args.SerialNumber.Buffer = buffer
+    args.SerialNumber.State = SerialNumberState.SNS_Full
+    success, _, definition = unpacker(args)
+    return success, definition
 
 
 def get_item_code(item: WillowInventory) -> str | None:
@@ -219,27 +211,24 @@ def get_item_code(item: WillowInventory) -> str | None:
     if getattr(def_data, primary_field) is None:
         return None
 
-    serial_string = item.GetSerialNumberString()
+    is_weapon = item.Class._inherits(WILLOW_WEAPON_CLASS)
+    fields = WEAPON_CODE_FIELDS if is_weapon else ITEM_CODE_FIELDS
 
-    gen_item, _ = item.CreateInventoryFromSerialNumberString(serial_string, None)
-    if gen_item is None:
-        return _full_encode_item(item)
-    if not (
-        gen_item.Class._inherits(WILLOW_WEAPON_CLASS) or gen_item.Class._inherits(WILLOW_ITEM_CLASS)
+    serial, _ = item.PackSerialNumber(def_data)  # pyright: ignore[reportArgumentType]
+    base_code = pack_serial(serial)
+    buffer = validate_serial(base64.b64decode(base_code, validate=True))
+    success, unpacked = _unpack_serial(buffer, item.Class)
+
+    if not success and not (
+        _serial_has_no_primary_definition(buffer, is_weapon)
+        and getattr(unpacked, primary_field) is None
     ):
-        return None
-    gen_item = cast("WillowWeapon | WillowItem", gen_item)
+        msg = "The game could not unpack the inventory serial for comparison"
+        raise ItemCodeDecodeError(msg)
 
-    gen_def_data = gen_item.DefinitionData
-    if gen_def_data is None:
-        return None
-
-    overrides = _definition_overrides(def_data, gen_def_data)
+    overrides = _definition_overrides(def_data, unpacked)
     if not overrides:
         return None
-
-    base_code = _get_base_item_code(item)
-    fields = WEAPON_CODE_FIELDS if item.Class._inherits(WILLOW_WEAPON_CLASS) else ITEM_CODE_FIELDS
 
     return encode_modded_code(base_code, overrides, fields, ZDICT_BYTES)
 
@@ -414,3 +403,22 @@ def decode_modded_item_code(
         raise ItemCodeDecodeError(msg)
 
     return definition, _apply_overrides(definition, overrides)
+
+
+def apply_modded_item_code(
+    code: str, current: DefinitionData
+) -> tuple[DefinitionData, dict[str, str]]:
+    base, replacements = _split_modded_code(code)
+    buffer = validate_serial(base)
+
+    is_weapon = bool(buffer[SERIAL_TYPE_OFFSET] & WEAPON_SERIAL_FLAG)
+    if is_weapon != (current._type.Name == "WeaponDefinitionData"):
+        msg = "Item code does not match the saved definition type"
+        raise ItemCodeDecodeError(msg)
+
+    fields = WEAPON_CODE_FIELDS if is_weapon else ITEM_CODE_FIELDS
+    overrides = _decode_overrides(replacements, fields)
+
+    definition = copy(current)
+    missing = _apply_overrides(definition, overrides)
+    return definition, missing
