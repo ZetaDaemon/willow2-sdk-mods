@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 
 import unrealsdk
 from mods_base import Game
+from unrealsdk import logging
 from unrealsdk.unreal import UClass, WrappedStruct
 
 from inventory_saver.object_cache import find_object
@@ -211,6 +212,12 @@ def get_item_code(item: WillowInventory) -> str | None:
     if def_data is None:
         return None
 
+    primary_field = (
+        "WeaponTypeDefinition" if item.Class._inherits(WILLOW_WEAPON_CLASS) else "ItemDefinition"
+    )
+    if getattr(def_data, primary_field) is None:
+        return None
+
     serial_string = item.GetSerialNumberString()
 
     gen_item, _ = item.CreateInventoryFromSerialNumberString(serial_string, None)
@@ -362,6 +369,7 @@ def _apply_overrides(
             try:
                 part = find_object(value)
             except ValueError:
+                logging.warning(f"Could not find object {value!r} for {name}")
                 missing[name] = value
                 continue
             setattr(definition, name, part)
