@@ -27,7 +27,7 @@ from .item_codes import (
     pack_serial,
     validate_serial,
 )
-from .saves import PlayerSaveData, get_save_path
+from .saves import PlayerSaveData, get_save_path, get_stash_path
 
 if TYPE_CHECKING:
     from bl2.WillowGame import PlayerSaveGame, WillowInventoryStorage
@@ -160,7 +160,7 @@ def _convert_code(definition: Any, record: LegacyRecord, *, is_weapon: bool) -> 
 
 
 def _commit_import(
-    save_id: int,
+    destination: Path,
     save_data: PlayerSaveData,
     updated: PlayerSaveData,
     path: Path,
@@ -175,7 +175,7 @@ def _commit_import(
         _atomic_write(backup, original)
 
     if updated != save_data:
-        _atomic_write(get_save_path(save_id), _json_bytes(updated))
+        _atomic_write(destination, _json_bytes(updated))
         save_data.update(updated)
 
     try:
@@ -255,7 +255,7 @@ def import_inventory(
             continue
         imported.add(item_id)
 
-    return _commit_import(save_id, save_data, updated, path, original, imported)
+    return _commit_import(get_save_path(save_id), save_data, updated, path, original, imported)
 
 
 def import_bank(
@@ -264,7 +264,33 @@ def import_bank(
     """Import matching live bank entries after Open and before the bank restore pass."""
     if save_id < 0 or not bank.ChestIsOpen:
         return 0
-    stem = f"Save{save_id & 0xFFFF:04X}_Bank"
+
+    return _import_storage(
+        bank,
+        save_data,
+        sanity_saver_saves,
+        f"Save{save_id & 0xFFFF:04X}_Bank",
+        get_save_path(save_id),
+    )
+
+
+def import_stash(
+    stash: WillowInventoryStorage, save_data: PlayerSaveData, sanity_saver_saves: Path
+) -> int:
+    """Import matching live stash entries into the shared stash save after Open."""
+    if not stash.ChestIsOpen:
+        return 0
+
+    return _import_storage(stash, save_data, sanity_saver_saves, "Stash", get_stash_path())
+
+
+def _import_storage(
+    storage: WillowInventoryStorage,
+    save_data: PlayerSaveData,
+    sanity_saver_saves: Path,
+    stem: str,
+    destination: Path,
+) -> int:
     source = _read_legacy(sanity_saver_saves, stem)
     if source is None:
         return 0
@@ -273,7 +299,7 @@ def import_bank(
     updated = deepcopy(save_data)
     imported: set[str] = set()
 
-    for entry in bank.TheChest:
+    for entry in storage.TheChest:
         item = entry.Inventory
         if item is None:
             continue
@@ -301,7 +327,7 @@ def import_bank(
             continue
         imported.add(item_id)
 
-    return _commit_import(save_id, save_data, updated, path, original, imported)
+    return _commit_import(destination, save_data, updated, path, original, imported)
 
 
 def _try_convert(

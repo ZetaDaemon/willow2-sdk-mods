@@ -9,19 +9,30 @@ from unrealsdk.hooks import Block, Type
 
 from .inventory_tools import (
     clear_pending_warning,
-    collect_bank_codes,
     collect_item_codes,
+    collect_storage_codes,
     collect_weapon_codes,
     is_pending_warning,
     remove_backed_up_bank_codes,
     remove_backed_up_inv_codes,
-    restore_bank_codes,
     restore_item_codes,
+    restore_storage_codes,
     restore_weapon_codes,
 )
 from .item_codes import ItemCodeDecodeError, get_item_code
-from .sanity_saver_importer import find_sanity_saver_saves, import_bank, import_inventory
-from .saves import PlayerSaveData, load_player_save, save_player_save
+from .sanity_saver_importer import (
+    find_sanity_saver_saves,
+    import_bank,
+    import_inventory,
+    import_stash,
+)
+from .saves import (
+    PlayerSaveData,
+    load_player_save,
+    load_stash_save,
+    save_player_save,
+    save_stash_save,
+)
 from .settings import (
     IGNORE_LOAD_WARNING,
     PROTECT_ITEMS,
@@ -59,31 +70,6 @@ else:
 
 
 WILLOW_INVENTORY_MANGER_CLASS = unrealsdk.find_class("WillowInventoryManager")
-
-
-@hook("WillowGame.WillowInventoryStorage:Close")  # pyright: ignore[reportArgumentType]
-def close_bank(
-    obj: WillowInventoryStorage, _args: WrappedStruct, _ret: Any, _func: BoundFunction
-) -> None:
-    if not obj.ChestIsOpen:
-        return
-
-    outer = cast("WillowInventoryManager | None", obj.Outer)
-
-    if outer is None or not outer.Class._inherits(WILLOW_INVENTORY_MANGER_CLASS):
-        return
-
-    if obj != outer.TheBank:
-        return
-
-    owner = cast("WillowPlayerController | None", outer.GetOwningPlayerController())
-    if owner is None:
-        return
-
-    save_data = load_player_save(owner.SaveGameFileId)
-    save_data["bank"] = collect_bank_codes(obj)
-    remove_backed_up_bank_codes(save_data)
-    save_player_save(owner.SaveGameFileId, save_data)
 
 
 @hook("WillowGame.WillowPlayerController:GeneratePlayerSaveGame")  # pyright: ignore[reportArgumentType]
@@ -135,8 +121,40 @@ def load_save(
     save_player_save(save.SaveGameId, save_data)
 
 
+@hook("WillowGame.WillowInventoryStorage:Close")  # pyright: ignore[reportArgumentType]
+def close_storage(
+    obj: WillowInventoryStorage, _args: WrappedStruct, _ret: Any, _func: BoundFunction
+) -> None:
+    if not obj.ChestIsOpen:
+        return
+
+    outer = cast("WillowInventoryManager | None", obj.Outer)
+
+    if outer is None or not outer.Class._inherits(WILLOW_INVENTORY_MANGER_CLASS):
+        return
+
+    owner = cast("WillowPlayerController | None", outer.GetOwningPlayerController())
+    if owner is None or not owner.IsLocalPlayerController():
+        return
+
+    if obj == outer.TheBank:
+        save_data = load_player_save(owner.SaveGameFileId)
+        saver = lambda the_save: save_player_save(owner.SaveGameFileId, the_save)
+
+    elif obj == outer.TheStash:
+        save_data = load_stash_save()
+        saver = save_stash_save
+
+    else:
+        return
+
+    save_data["bank"] = collect_storage_codes(obj)
+    remove_backed_up_bank_codes(save_data)
+    saver(save_data)
+
+
 @hook("WillowGame.WillowInventoryStorage:Open", Type.POST)  # pyright: ignore[reportArgumentType]
-def open_bank(
+def open_storage(
     obj: WillowInventoryStorage,
     _args: WrappedStruct,
     ret: WillowInventoryStorage.Open.ret,
@@ -150,24 +168,37 @@ def open_bank(
     if outer is None or not outer.Class._inherits(WILLOW_INVENTORY_MANGER_CLASS):
         return
 
-    if obj != outer.TheBank:
-        return
-
     owner = cast("WillowPlayerController | None", outer.GetOwningPlayerController())
     if owner is None or not owner.IsLocalPlayerController():
         return
 
-    save_data = load_player_save(owner.SaveGameFileId)
+    if obj == outer.TheBank:
+        save_data = load_player_save(owner.SaveGameFileId)
+        saver = lambda the_save: save_player_save(owner.SaveGameFileId, the_save)
 
-    try:
-        ss_path = find_sanity_saver_saves()
-        if ss_path is not None:
-            import_bank(obj, owner.SaveGameFileId, save_data, ss_path)
-    except (ValueError, OSError, EOFError) as exc:
-        logging.error(f"Sanity Saver import failed: {exc}")
+        try:
+            ss_path = find_sanity_saver_saves()
+            if ss_path is not None:
+                import_bank(obj, owner.SaveGameFileId, save_data, ss_path)
+        except (ValueError, OSError, EOFError) as exc:
+            logging.error(f"Sanity Saver import failed: {exc}")
 
-    restore_bank_codes(obj, save_data)
-    save_player_save(owner.SaveGameFileId, save_data)
+    elif obj == outer.TheStash:
+        save_data = load_stash_save()
+        saver = save_stash_save
+
+        try:
+            ss_path = find_sanity_saver_saves()
+            if ss_path is not None:
+                import_stash(obj, save_data, ss_path)
+        except (ValueError, OSError, EOFError) as exc:
+            logging.error(f"Sanity Saver import failed: {exc}")
+
+    else:
+        return
+
+    restore_storage_codes(obj, save_data)
+    saver(save_data)
 
 
 @hook("WillowGame.WillowPlayerController:ValidateItemDefinition")

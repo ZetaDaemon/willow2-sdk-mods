@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import TypedDict, TypeGuard
 
 from mods_base import SETTINGS_DIR
-from unrealsdk import logging
 
 SAVES_DIR = SETTINGS_DIR / "inventory_saver"
+STASH_FILE_NAME = "Stash.json"
 
 
 class ItemSaveData(TypedDict):
@@ -107,6 +107,37 @@ def load_player_save(save_id: int) -> PlayerSaveData:
 
 def save_player_save(save_id: int, data: PlayerSaveData) -> None:
     path = get_save_path(save_id)
+
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+
+def get_stash_path() -> Path:
+    SAVES_DIR.mkdir(parents=True, exist_ok=True)
+    return SAVES_DIR / f"{STASH_FILE_NAME}"
+
+
+def load_stash_save() -> PlayerSaveData:
+    path = get_stash_path()
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            data: object = json.load(file)
+    except FileNotFoundError:
+        return _new_save_data()
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        msg = f"Malformed inventory save at {path}"
+        raise ValueError(msg) from exc
+
+    if not is_player_save_data(data):
+        msg = f"Invalid inventory save structure at {path}"
+        raise ValueError(msg)
+
+    return data
+
+
+def save_stash_save(data: PlayerSaveData) -> None:
+    path = get_stash_path()
 
     with path.open("w", encoding="utf-8") as file:
         json.dump(data, file, indent=2)

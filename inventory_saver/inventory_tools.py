@@ -106,7 +106,7 @@ def collect_item_codes(
     return items
 
 
-def collect_bank_codes(the_bank: WillowInventoryStorage) -> dict[str, ItemSaveData]:
+def collect_storage_codes(the_bank: WillowInventoryStorage) -> dict[str, ItemSaveData]:
     items: dict[str, ItemSaveData] = {}
 
     item_list = [data.Inventory for data in the_bank.TheChest if data.Inventory is not None]
@@ -316,17 +316,17 @@ def restore_item_codes(save: PlayerSaveGame, save_data: PlayerSaveData) -> None:
     save_data["items"] = new_items
 
 
-def restore_bank_codes(bank: WillowInventoryStorage, save_data: PlayerSaveData) -> None:
+def restore_storage_codes(storage: WillowInventoryStorage, save_data: PlayerSaveData) -> None:
     global pending_missing_parts_warning
     active = save_data["bank"]
     pending = save_data["backup"]["bank"]
     new_bank: dict[str, ItemSaveData] = {}
     next_backup: dict[str, ItemSaveData] = {}
     protect = PROTECT_ITEMS.value
-    pawn = bank.Outer.Owner
+    pawn = storage.Outer.Owner
     live_ids: set[str] = set()
 
-    for entry in bank.TheChest:
+    for entry in storage.TheChest:
         item = entry.Inventory
         if item is None:
             continue
@@ -371,7 +371,7 @@ def restore_bank_codes(bank: WillowInventoryStorage, save_data: PlayerSaveData) 
             continue
 
         retry = next_backup if protect else new_bank
-        if bank.GetSizeIncludingUnloadable() >= bank.GetMaxSize():
+        if storage.GetSizeIncludingUnloadable() >= storage.GetMaxSize():
             retry[item_id] = record
             continue
 
@@ -380,12 +380,12 @@ def restore_bank_codes(bank: WillowInventoryStorage, save_data: PlayerSaveData) 
             recovered = WILLOW_WEAPON_CLASS.ClassDefaultObject.CreateWeaponFromDef(
                 definition, pawn, False
             )
-            put = bank.PutWeapon
+            put = storage.PutWeapon
         else:
             recovered = WILLOW_ITEM_CLASS.ClassDefaultObject.CreateItemFromDef(
                 definition, pawn, record["quantity"], False
             )
-            put = bank.PutItem
+            put = storage.PutItem
 
         if recovered is None:
             retry[item_id] = record
